@@ -12,6 +12,9 @@ import ApprovalsPage from './pages/ApprovalsPage';
 import SettingsPage from './pages/SettingsPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import LeadershipDashboardPage from './pages/LeadershipDashboardPage';
+import ApprovalReceiptPage from './pages/ApprovalReceiptPage';
+import PurchaseHistoryPage from './pages/PurchaseHistoryPage';
+import MyReceiptsPage from './pages/MyReceiptsPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth();
@@ -150,6 +153,14 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/request/:id/receipt"
+        element={
+          <ProtectedRoute>
+            <ApprovalReceiptPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/approvals"
         element={
           <ProtectedRoute>
@@ -178,6 +189,22 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <LeadershipDashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/purchase-history"
+        element={
+          <ProtectedRoute>
+            <PurchaseHistoryPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/my-receipts"
+        element={
+          <ProtectedRoute>
+            <MyReceiptsPage />
           </ProtectedRoute>
         }
       />

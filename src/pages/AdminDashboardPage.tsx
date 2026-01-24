@@ -16,12 +16,131 @@ import {
   ChevronRight,
   Loader2,
   Copy,
-  Check
+  Check,
+  Settings,
+  CreditCard,
+  Trash2,
+  RotateCcw,
+  Shield,
+  AlertTriangle,
+  Search,
+  User,
+  Archive,
+  X,
+  Zap,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import type { AuditLog, EmailNotification, Profile, PurchaseRequest } from '../types/database';
+import PCardWidget from '../components/PCardWidget';
+import type { AuditLog, EmailNotification, Profile } from '../types/database';
 
-type TabType = 'overview' | 'sql' | 'audit' | 'emails' | 'users';
+type TabType = 'overview' | 'sql' | 'audit' | 'emails' | 'users' | 'controls';
+
+interface ConfirmDialogProps {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  confirmText: string;
+  confirmButtonText: string;
+  danger?: boolean;
+  loading?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function ConfirmDialog({ isOpen, title, message, confirmText, confirmButtonText, danger, loading, onConfirm, onCancel }: ConfirmDialogProps) {
+  const [inputValue, setInputValue] = useState('');
+
+  useEffect(() => {
+    if (!isOpen) setInputValue('');
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
+      <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div className={`px-6 py-4 ${danger ? 'bg-red-50 border-b border-red-100' : 'bg-slate-50 border-b border-slate-100'}`}>
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${danger ? 'bg-red-100' : 'bg-blue-100'}`}>
+              <AlertTriangle className={`w-5 h-5 ${danger ? 'text-red-600' : 'text-blue-600'}`} />
+            </div>
+            <h3 className={`text-lg font-semibold ${danger ? 'text-red-800' : 'text-slate-800'}`}>{title}</h3>
+          </div>
+        </div>
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-slate-600">{message}</p>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Type <code className={`px-2 py-0.5 rounded text-sm ${danger ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700'}`}>{confirmText}</code> to confirm:
+            </label>
+            <input
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              className={`w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-2 ${danger ? 'border-red-200 focus:ring-red-500' : 'border-slate-200 focus:ring-blue-500'}`}
+              placeholder="Type confirmation..."
+              autoFocus
+            />
+          </div>
+        </div>
+        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+          <button
+            onClick={onCancel}
+            disabled={loading}
+            className="px-4 py-2 text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 font-medium transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={inputValue !== confirmText || loading}
+            className={`px-4 py-2 text-white rounded-lg font-medium transition-colors flex items-center gap-2 ${
+              danger
+                ? 'bg-red-600 hover:bg-red-700 disabled:bg-slate-300'
+                : 'bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300'
+            }`}
+          >
+            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+            {confirmButtonText}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface EmployeeStats {
+  employee: {
+    id: string;
+    full_name: string;
+    email: string;
+    department: string;
+    role: string;
+    created_at: string;
+  };
+  stats: {
+    total_requests: number;
+    approved_requests: number;
+    rejected_requests: number;
+    pending_requests: number;
+    total_spent: number;
+    avg_amount: number;
+    approval_rate: number;
+    first_request: string | null;
+    last_request: string | null;
+  };
+}
+
+interface PCardUsage {
+  current_usage: number;
+  monthly_limit: number;
+  remaining: number;
+  utilization_percent: number;
+  hard_stop_enabled: boolean;
+  is_limit_reached: boolean;
+  month: string;
+}
 
 interface QueryResult {
   data: Record<string, unknown>[] | null;
@@ -134,6 +253,18 @@ export default function AdminDashboardPage() {
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
   const [expandedEmail, setExpandedEmail] = useState<string | null>(null);
   const [copiedQuery, setCopiedQuery] = useState<string | null>(null);
+  const [pcardUsage, setPcardUsage] = useState<PCardUsage | null>(null);
+  const [newLimit, setNewLimit] = useState('');
+  const [controlLoading, setControlLoading] = useState<string | null>(null);
+  const [controlMessage, setControlMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    type: 'clear' | 'truncate' | 'reset' | null;
+  }>({ isOpen: false, type: null });
+  const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
+  const [employeeStats, setEmployeeStats] = useState<EmployeeStats | null>(null);
+  const [employeeLoading, setEmployeeLoading] = useState(false);
+  const [employeeSearch, setEmployeeSearch] = useState('');
 
   useEffect(() => {
     loadData();
@@ -146,8 +277,17 @@ export default function AdminDashboardPage() {
       loadAuditLogs(),
       loadEmails(),
       loadUsers(),
+      loadPcardUsage(),
     ]);
     setLoading(false);
+  }
+
+  async function loadPcardUsage() {
+    const { data, error } = await supabase.rpc('get_pcard_monthly_usage');
+    if (!error && data) {
+      setPcardUsage(data as PCardUsage);
+      setNewLimit(String(data.monthly_limit));
+    }
   }
 
   async function loadStats() {
@@ -256,6 +396,124 @@ export default function AdminDashboardPage() {
     return new Date(dateStr).toLocaleString();
   }
 
+  async function handleResetPcardLimit() {
+    const limitValue = parseFloat(newLimit);
+    if (isNaN(limitValue) || limitValue < 0) {
+      setControlMessage({ type: 'error', text: 'Please enter a valid positive number' });
+      return;
+    }
+
+    setControlLoading('limit');
+    setControlMessage(null);
+
+    const { data, error } = await supabase.rpc('admin_reset_pcard_limit', { new_limit: limitValue });
+
+    if (error) {
+      setControlMessage({ type: 'error', text: error.message });
+    } else {
+      setControlMessage({ type: 'success', text: `P-Card limit updated from $${data.old_limit?.toLocaleString()} to $${data.new_limit?.toLocaleString()}` });
+      await loadPcardUsage();
+      await loadAuditLogs();
+    }
+    setControlLoading(null);
+  }
+
+  async function handleToggleHardStop() {
+    if (!pcardUsage) return;
+
+    setControlLoading('hardstop');
+    setControlMessage(null);
+
+    const { data, error } = await supabase.rpc('admin_set_hard_stop', { enabled: !pcardUsage.hard_stop_enabled });
+
+    if (error) {
+      setControlMessage({ type: 'error', text: error.message });
+    } else {
+      setControlMessage({ type: 'success', text: data.message });
+      await loadPcardUsage();
+      await loadAuditLogs();
+    }
+    setControlLoading(null);
+  }
+
+  async function handleResetMonthlyUsage() {
+    setControlLoading('reset');
+    setControlMessage(null);
+
+    const { data, error } = await supabase.rpc('admin_reset_monthly_usage');
+
+    if (error) {
+      setControlMessage({ type: 'error', text: error.message });
+    } else {
+      setControlMessage({ type: 'success', text: `Monthly usage reset. ${data.archived_count} requests archived ($${data.previous_usage?.toLocaleString()})` });
+      await loadPcardUsage();
+      await loadStats();
+      await loadAuditLogs();
+    }
+    setControlLoading(null);
+  }
+
+  async function handleClearAllPurchases() {
+    setControlLoading('clear');
+    setControlMessage(null);
+
+    const { data, error } = await supabase.rpc('admin_clear_all_purchases', {
+      confirm_text: 'CONFIRM_DELETE_ALL_PURCHASES',
+      create_backup: true
+    });
+
+    if (error) {
+      setControlMessage({ type: 'error', text: error.message });
+    } else {
+      setControlMessage({ type: 'success', text: `All data cleared: ${data.deleted_requests} requests, ${data.deleted_receipts} receipts. Backup created for recovery.` });
+      await loadPcardUsage();
+      await loadStats();
+      await loadAuditLogs();
+    }
+    setControlLoading(null);
+    setConfirmDialog({ isOpen: false, type: null });
+  }
+
+  async function handleTruncateAll() {
+    setControlLoading('truncate');
+    setControlMessage(null);
+
+    const { data, error } = await supabase.rpc('admin_truncate_all_data', {
+      confirm_text: 'PERMANENTLY_DELETE_EVERYTHING'
+    });
+
+    if (error) {
+      setControlMessage({ type: 'error', text: error.message });
+    } else {
+      setControlMessage({ type: 'success', text: data.message });
+      await loadPcardUsage();
+      await loadStats();
+      await loadAuditLogs();
+    }
+    setControlLoading(null);
+    setConfirmDialog({ isOpen: false, type: null });
+  }
+
+  async function loadEmployeeStats(employeeId: string) {
+    setEmployeeLoading(true);
+    setEmployeeStats(null);
+
+    const { data, error } = await supabase.rpc('admin_get_employee_stats', { employee_id: employeeId });
+
+    if (error) {
+      setControlMessage({ type: 'error', text: error.message });
+    } else {
+      setEmployeeStats(data as EmployeeStats);
+    }
+    setEmployeeLoading(false);
+  }
+
+  const filteredUsers = users.filter(user =>
+    user.full_name?.toLowerCase().includes(employeeSearch.toLowerCase()) ||
+    user.email?.toLowerCase().includes(employeeSearch.toLowerCase()) ||
+    user.department?.toLowerCase().includes(employeeSearch.toLowerCase())
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -274,6 +532,7 @@ export default function AdminDashboardPage() {
       <div className="flex gap-2 border-b border-slate-200 overflow-x-auto pb-px">
         {[
           { id: 'overview', label: 'Overview', icon: TrendingUp },
+          { id: 'controls', label: 'Admin Controls', icon: Settings },
           { id: 'sql', label: 'SQL Console', icon: Database },
           { id: 'audit', label: 'Audit Trail', icon: History },
           { id: 'emails', label: 'Email Log', icon: Mail },
@@ -296,31 +555,36 @@ export default function AdminDashboardPage() {
 
       {activeTab === 'overview' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard
-              icon={FileText}
-              label="Total Requests"
-              value={stats.totalRequests}
-              color="blue"
-            />
-            <StatCard
-              icon={Clock}
-              label="Pending"
-              value={stats.pendingRequests}
-              color="amber"
-            />
-            <StatCard
-              icon={CheckCircle}
-              label="Approved"
-              value={stats.approvedRequests}
-              color="emerald"
-            />
-            <StatCard
-              icon={XCircle}
-              label="Rejected"
-              value={stats.rejectedRequests}
-              color="red"
-            />
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+            <div className="lg:col-span-1">
+              <PCardWidget />
+            </div>
+            <div className="lg:col-span-4 grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard
+                icon={FileText}
+                label="Total Requests"
+                value={stats.totalRequests}
+                color="blue"
+              />
+              <StatCard
+                icon={Clock}
+                label="Pending"
+                value={stats.pendingRequests}
+                color="amber"
+              />
+              <StatCard
+                icon={CheckCircle}
+                label="Approved"
+                value={stats.approvedRequests}
+                color="emerald"
+              />
+              <StatCard
+                icon={XCircle}
+                label="Rejected"
+                value={stats.rejectedRequests}
+                color="red"
+              />
+            </div>
           </div>
 
           <div className="grid lg:grid-cols-2 gap-6">
@@ -358,22 +622,296 @@ export default function AdminDashboardPage() {
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h3 className="font-semibold text-slate-800 mb-4">Recent Activity</h3>
             <div className="space-y-3">
-              {auditLogs.slice(0, 5).map((log) => (
-                <div key={log.id} className="flex items-center gap-3 text-sm">
-                  <div className={`w-2 h-2 rounded-full ${
-                    log.action === 'INSERT' ? 'bg-emerald-500' :
-                    log.action === 'UPDATE' ? 'bg-blue-500' : 'bg-red-500'
-                  }`} />
-                  <span className="text-slate-600">{log.user_email || 'System'}</span>
-                  <span className="text-slate-400">{log.action.toLowerCase()}</span>
-                  <span className="text-slate-800 font-medium">{log.entity_type}</span>
-                  <span className="text-slate-400 ml-auto">{formatDate(log.created_at)}</span>
-                </div>
-              ))}
+              {auditLogs.slice(0, 5).map((log) => {
+                const changes = log.changes as Record<string, unknown> | null;
+                const getActivityDescription = () => {
+                  if (changes?.action === 'ADMIN_CLEAR_ALL_PURCHASES') {
+                    return 'Admin cleared all purchase data';
+                  }
+                  if (changes?.action === 'ADMIN_TRUNCATE_ALL_DATA') {
+                    return 'Admin permanently deleted all data';
+                  }
+                  if (changes?.action === 'ADMIN_RESET_MONTHLY_USAGE') {
+                    return `Admin reset monthly usage (archived ${changes.archived_count || 0} requests)`;
+                  }
+                  if (changes?.action === 'ADMIN_SET_LIMIT') {
+                    return `Admin set monthly limit to $${(changes.new_limit as number)?.toLocaleString() || 0}`;
+                  }
+                  if (changes?.action === 'ADMIN_SET_HARD_STOP') {
+                    return `Admin ${changes.hard_stop_enabled ? 'enabled' : 'disabled'} hard stop`;
+                  }
+
+                  const actionMap: Record<string, string> = {
+                    INSERT: 'Created',
+                    UPDATE: 'Updated',
+                    DELETE: 'Deleted',
+                  };
+                  const entityMap: Record<string, string> = {
+                    purchase_requests: 'purchase request',
+                    purchase_receipts: 'receipt',
+                    approval_signatures: 'approval',
+                    profiles: 'profile',
+                    budgets: 'budget',
+                  };
+
+                  const action = actionMap[log.action] || log.action.toLowerCase();
+                  const entity = entityMap[log.entity_type] || log.entity_type.replace(/_/g, ' ');
+
+                  if (changes?.vendor) {
+                    return `${action} "${changes.vendor}" ${entity}`;
+                  }
+                  if (changes?.new_status) {
+                    return `${action} request to ${changes.new_status}`;
+                  }
+
+                  return `${action} ${entity}`;
+                };
+
+                return (
+                  <div key={log.id} className="flex items-center gap-3 text-sm">
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                      log.action === 'INSERT' ? 'bg-emerald-500' :
+                      log.action === 'UPDATE' ? 'bg-blue-500' : 'bg-red-500'
+                    }`} />
+                    <span className="text-slate-600 truncate max-w-[140px]">{log.user_email || 'System'}</span>
+                    <span className="text-slate-800 flex-1 truncate">{getActivityDescription()}</span>
+                    <span className="text-slate-400 text-xs whitespace-nowrap">{formatDate(log.created_at)}</span>
+                  </div>
+                );
+              })}
+              {auditLogs.length === 0 && (
+                <p className="text-sm text-slate-400 text-center py-4">No recent activity</p>
+              )}
             </div>
           </div>
         </div>
       )}
+
+      {activeTab === 'controls' && (
+        <div className="space-y-6">
+          {controlMessage && (
+            <div className={`p-4 rounded-xl flex items-center gap-3 ${
+              controlMessage.type === 'success'
+                ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                : 'bg-red-50 border border-red-200 text-red-800'
+            }`}>
+              {controlMessage.type === 'success' ? (
+                <CheckCircle className="w-5 h-5 flex-shrink-0" />
+              ) : (
+                <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              )}
+              <span className="text-sm">{controlMessage.text}</span>
+              <button onClick={() => setControlMessage(null)} className="ml-auto text-current opacity-50 hover:opacity-100">
+                <XCircle className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          <div className="grid lg:grid-cols-2 gap-6">
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              <div className="px-5 py-4 bg-slate-50 border-b border-slate-200 flex items-center gap-3">
+                <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                  <CreditCard className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-800">P-Card Monthly Limit</h3>
+                  <p className="text-xs text-slate-500">Set the maximum monthly spending limit</p>
+                </div>
+              </div>
+              <div className="p-5 space-y-4">
+                {pcardUsage && (
+                  <div className="bg-slate-50 rounded-lg p-4 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-600">Current Usage</span>
+                      <span className="font-semibold text-slate-800">${pcardUsage.current_usage.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-600">Monthly Limit</span>
+                      <span className="font-semibold text-slate-800">${pcardUsage.monthly_limit.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-600">Remaining</span>
+                      <span className={`font-semibold ${pcardUsage.remaining < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                        ${pcardUsage.remaining.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden mt-2">
+                      <div
+                        className={`h-full transition-all ${pcardUsage.utilization_percent >= 100 ? 'bg-red-500' : pcardUsage.utilization_percent >= 80 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                        style={{ width: `${Math.min(pcardUsage.utilization_percent, 100)}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-slate-500 text-center">{pcardUsage.utilization_percent}% utilized</p>
+                  </div>
+                )}
+                <div className="flex gap-3">
+                  <div className="relative flex-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                    <input
+                      type="number"
+                      value={newLimit}
+                      onChange={(e) => setNewLimit(e.target.value)}
+                      className="w-full pl-7 pr-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      placeholder="15000"
+                    />
+                  </div>
+                  <button
+                    onClick={handleResetPcardLimit}
+                    disabled={controlLoading === 'limit'}
+                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    {controlLoading === 'limit' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                    Update
+                  </button>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Shield className={`w-5 h-5 ${pcardUsage?.hard_stop_enabled ? 'text-emerald-600' : 'text-slate-400'}`} />
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">Hard Stop at Limit</p>
+                      <p className="text-xs text-slate-500">Block new requests when limit is reached</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleToggleHardStop}
+                    disabled={controlLoading === 'hardstop'}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${
+                      pcardUsage?.hard_stop_enabled ? 'bg-emerald-600' : 'bg-slate-300'
+                    }`}
+                  >
+                    {controlLoading === 'hardstop' ? (
+                      <Loader2 className="w-4 h-4 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white animate-spin" />
+                    ) : (
+                      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                        pcardUsage?.hard_stop_enabled ? 'left-7' : 'left-1'
+                      }`} />
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              <div className="px-5 py-4 bg-slate-50 border-b border-slate-200 flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <RotateCcw className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-800">Reset Monthly Usage</h3>
+                  <p className="text-xs text-slate-500">Archive current month purchases and reset counter</p>
+                </div>
+              </div>
+              <div className="p-5 space-y-4">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
+                  <p className="font-medium mb-1">What this does:</p>
+                  <ul className="list-disc list-inside space-y-1 text-blue-700">
+                    <li>Archives all approved requests from current month</li>
+                    <li>Resets the P-Card usage counter to $0</li>
+                    <li>Archived requests remain in history for reporting</li>
+                  </ul>
+                </div>
+                <button
+                  onClick={handleResetMonthlyUsage}
+                  disabled={controlLoading === 'reset'}
+                  className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  {controlLoading === 'reset' ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+                  Reset Monthly Usage
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="px-5 py-4 bg-slate-50 border-b border-slate-200 flex items-center gap-3">
+              <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-slate-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-slate-800">Data Management - Danger Zone</h3>
+                <p className="text-xs text-slate-500">Clear or truncate all purchase data</p>
+              </div>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="border border-amber-200 rounded-xl p-4 bg-amber-50/50">
+                  <div className="flex items-center gap-3 mb-3">
+                    <Archive className="w-5 h-5 text-amber-600" />
+                    <h4 className="font-semibold text-amber-800">Clear with Backup</h4>
+                  </div>
+                  <p className="text-sm text-amber-700 mb-4">
+                    Deletes all data but creates a backup for potential recovery within 30 days.
+                  </p>
+                  <button
+                    onClick={() => setConfirmDialog({ isOpen: true, type: 'clear' })}
+                    disabled={controlLoading === 'clear'}
+                    className="w-full px-4 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-300 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    {controlLoading === 'clear' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4" />}
+                    Clear All (Safe)
+                  </button>
+                </div>
+
+                <div className="border border-red-200 rounded-xl p-4 bg-red-50/50">
+                  <div className="flex items-center gap-3 mb-3">
+                    <Zap className="w-5 h-5 text-red-600" />
+                    <h4 className="font-semibold text-red-800">Truncate (Permanent)</h4>
+                  </div>
+                  <p className="text-sm text-red-700 mb-4">
+                    Permanently destroys all data with NO backup. Cannot be recovered.
+                  </p>
+                  <button
+                    onClick={() => setConfirmDialog({ isOpen: true, type: 'truncate' })}
+                    disabled={controlLoading === 'truncate'}
+                    className="w-full px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-slate-300 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    {controlLoading === 'truncate' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                    Truncate All (Danger)
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-slate-50 rounded-lg p-4 text-sm">
+                <p className="font-medium text-slate-700 mb-2">What's the difference?</p>
+                <ul className="space-y-2 text-slate-600">
+                  <li className="flex items-start gap-2">
+                    <Archive className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                    <span><strong>Clear:</strong> Uses DELETE statements, creates backup, data recoverable for 30 days</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Zap className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                    <span><strong>Truncate:</strong> Uses TRUNCATE (faster), no backup, instantly destroys data forever</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen && confirmDialog.type === 'clear'}
+        title="Clear All Purchase Data"
+        message="This will delete all purchase requests, receipts, and approval signatures. A backup will be created that can be restored within 30 days."
+        confirmText="CONFIRM_DELETE_ALL_PURCHASES"
+        confirmButtonText="Clear All Data"
+        danger
+        loading={controlLoading === 'clear'}
+        onConfirm={handleClearAllPurchases}
+        onCancel={() => setConfirmDialog({ isOpen: false, type: null })}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen && confirmDialog.type === 'truncate'}
+        title="Permanently Destroy All Data"
+        message="WARNING: This will PERMANENTLY destroy all purchase data using TRUNCATE. No backup will be created. This action CANNOT be undone under any circumstances."
+        confirmText="PERMANENTLY_DELETE_EVERYTHING"
+        confirmButtonText="Destroy Everything"
+        danger
+        loading={controlLoading === 'truncate'}
+        onConfirm={handleTruncateAll}
+        onCancel={() => setConfirmDialog({ isOpen: false, type: null })}
+      />
 
       {activeTab === 'sql' && (
         <div className="space-y-6">
@@ -606,41 +1144,165 @@ export default function AdminDashboardPage() {
       )}
 
       {activeTab === 'users' && (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
-            <span className="text-sm font-medium text-slate-700">Registered Users ({users.length})</span>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th className="px-4 py-3 text-left font-medium text-slate-700">Name</th>
-                  <th className="px-4 py-3 text-left font-medium text-slate-700">Email</th>
-                  <th className="px-4 py-3 text-left font-medium text-slate-700">Department</th>
-                  <th className="px-4 py-3 text-left font-medium text-slate-700">Role</th>
-                  <th className="px-4 py-3 text-left font-medium text-slate-700">Created</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {users.map((user) => (
-                  <tr key={user.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 font-medium text-slate-800">{user.full_name || '-'}</td>
-                    <td className="px-4 py-3 text-slate-600">{user.email}</td>
-                    <td className="px-4 py-3 text-slate-600">{user.department || '-'}</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                        user.role === 'admin' ? 'bg-amber-100 text-amber-700' :
-                        user.role === 'approver' ? 'bg-emerald-100 text-emerald-700' :
-                        'bg-blue-100 text-blue-700'
-                      }`}>
-                        {user.role}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-slate-500">{formatDate(user.created_at)}</td>
+        <div className="grid lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <span className="text-sm font-medium text-slate-700">Registered Users ({filteredUsers.length})</span>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={employeeSearch}
+                  onChange={(e) => setEmployeeSearch(e.target.value)}
+                  placeholder="Search users..."
+                  className="pl-9 pr-4 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+            </div>
+            <div className="overflow-x-auto max-h-[600px]">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 sticky top-0">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium text-slate-700">Name</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-700">Email</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-700">Department</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-700">Role</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-700">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredUsers.map((user) => (
+                    <tr key={user.id} className={`hover:bg-slate-50 ${selectedEmployee === user.id ? 'bg-emerald-50' : ''}`}>
+                      <td className="px-4 py-3 font-medium text-slate-800">{user.full_name || '-'}</td>
+                      <td className="px-4 py-3 text-slate-600">{user.email}</td>
+                      <td className="px-4 py-3 text-slate-600">{user.department || '-'}</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          user.role === 'admin' ? 'bg-amber-100 text-amber-700' :
+                          user.role === 'approver' ? 'bg-emerald-100 text-emerald-700' :
+                          'bg-blue-100 text-blue-700'
+                        }`}>
+                          {user.role}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => {
+                            setSelectedEmployee(user.id);
+                            loadEmployeeStats(user.id);
+                          }}
+                          className="px-3 py-1.5 text-xs font-medium text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
+                        >
+                          View Stats
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
+                <User className="w-4 h-4 text-slate-500" />
+                <span className="text-sm font-medium text-slate-700">Employee Details</span>
+              </div>
+              <div className="p-4">
+                {employeeLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 text-emerald-600 animate-spin" />
+                  </div>
+                ) : employeeStats ? (
+                  <div className="space-y-4">
+                    <div className="text-center pb-4 border-b border-slate-200">
+                      <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <User className="w-8 h-8 text-emerald-600" />
+                      </div>
+                      <h3 className="font-semibold text-slate-800">{employeeStats.employee.full_name}</h3>
+                      <p className="text-sm text-slate-500">{employeeStats.employee.email}</p>
+                      <div className="flex items-center justify-center gap-2 mt-2">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                          employeeStats.employee.role === 'admin' ? 'bg-amber-100 text-amber-700' :
+                          employeeStats.employee.role === 'approver' ? 'bg-emerald-100 text-emerald-700' :
+                          'bg-blue-100 text-blue-700'
+                        }`}>
+                          {employeeStats.employee.role}
+                        </span>
+                        {employeeStats.employee.department && (
+                          <span className="text-xs text-slate-500">{employeeStats.employee.department}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-slate-50 rounded-lg p-3 text-center">
+                        <p className="text-2xl font-bold text-slate-800">{employeeStats.stats.total_requests}</p>
+                        <p className="text-xs text-slate-500">Total Requests</p>
+                      </div>
+                      <div className="bg-emerald-50 rounded-lg p-3 text-center">
+                        <p className="text-2xl font-bold text-emerald-600">{employeeStats.stats.approved_requests}</p>
+                        <p className="text-xs text-slate-500">Approved</p>
+                      </div>
+                      <div className="bg-amber-50 rounded-lg p-3 text-center">
+                        <p className="text-2xl font-bold text-amber-600">{employeeStats.stats.pending_requests}</p>
+                        <p className="text-xs text-slate-500">Pending</p>
+                      </div>
+                      <div className="bg-red-50 rounded-lg p-3 text-center">
+                        <p className="text-2xl font-bold text-red-600">{employeeStats.stats.rejected_requests}</p>
+                        <p className="text-xs text-slate-500">Rejected</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 pt-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Total Spent</span>
+                        <span className="font-semibold text-slate-800">${employeeStats.stats.total_spent.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Avg Amount</span>
+                        <span className="font-semibold text-slate-800">${employeeStats.stats.avg_amount.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-600">Approval Rate</span>
+                        <span className={`font-semibold ${employeeStats.stats.approval_rate >= 80 ? 'text-emerald-600' : employeeStats.stats.approval_rate >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
+                          {employeeStats.stats.approval_rate}%
+                        </span>
+                      </div>
+                      {employeeStats.stats.first_request && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-slate-600">First Request</span>
+                          <span className="text-slate-500">{new Date(employeeStats.stats.first_request).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                      {employeeStats.stats.last_request && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-slate-600">Last Request</span>
+                          <span className="text-slate-500">{new Date(employeeStats.stats.last_request).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setSelectedEmployee(null);
+                        setEmployeeStats(null);
+                      }}
+                      className="w-full px-4 py-2 text-sm text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded-lg transition-colors flex items-center justify-center gap-2"
+                    >
+                      <X className="w-4 h-4" />
+                      Clear Selection
+                    </button>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-slate-500">
+                    <User className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                    <p className="text-sm">Select a user to view their stats</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}

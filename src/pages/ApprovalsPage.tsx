@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import PCardWidget from '../components/PCardWidget';
 import type { PurchaseRequest } from '../types/database';
 import { getApprovalTier } from '../utils/validation';
 
@@ -101,42 +102,47 @@ export default function ApprovalsPage() {
         <p className="text-slate-500 mt-1">Review and approve purchase requests</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center">
-              <Clock className="w-5 h-5 text-amber-600" />
-            </div>
-          </div>
-          <p className="text-2xl font-bold text-slate-800">{pendingRequests.length}</p>
-          <p className="text-sm text-slate-500">Pending Requests</p>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-8">
+        <div className="lg:col-span-1">
+          <PCardWidget />
         </div>
-
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-10 h-10 bg-sky-50 rounded-lg flex items-center justify-center">
-              <DollarSign className="w-5 h-5 text-sky-600" />
+        <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center">
+                <Clock className="w-5 h-5 text-amber-600" />
+              </div>
             </div>
+            <p className="text-2xl font-bold text-slate-800">{pendingRequests.length}</p>
+            <p className="text-sm text-slate-500">Pending Requests</p>
           </div>
-          <p className="text-2xl font-bold text-slate-800">
-            $
-            {pendingRequests
-              .reduce((sum, r) => sum + r.total_amount, 0)
-              .toLocaleString()}
-          </p>
-          <p className="text-sm text-slate-500">Total Value Pending</p>
-        </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5 text-red-600" />
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-10 h-10 bg-sky-50 rounded-lg flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-sky-600" />
+              </div>
             </div>
+            <p className="text-2xl font-bold text-slate-800">
+              $
+              {pendingRequests
+                .reduce((sum, r) => sum + r.total_amount, 0)
+                .toLocaleString()}
+            </p>
+            <p className="text-sm text-slate-500">Total Value Pending</p>
           </div>
-          <p className="text-2xl font-bold text-slate-800">
-            {pendingRequests.filter((r) => r.total_amount > 5000).length}
-          </p>
-          <p className="text-sm text-slate-500">High-Value Requests (&gt;$5K)</p>
+
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-slate-800">
+              {pendingRequests.filter((r) => r.total_amount > 5000).length}
+            </p>
+            <p className="text-sm text-slate-500">High-Value Requests (&gt;$5K)</p>
+          </div>
         </div>
       </div>
 

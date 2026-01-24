@@ -3,7 +3,6 @@ import { Eraser, Check, Type, Pencil, ChevronDown } from 'lucide-react';
 
 interface SignaturePadProps {
   onSignatureChange: (signatureDataUrl: string | null) => void;
-  initialSignature?: string | null;
 }
 
 const SIGNATURE_FONTS = [
@@ -14,11 +13,11 @@ const SIGNATURE_FONTS = [
   { name: 'Bold Signature', value: 'italic bold 28px "Times New Roman", serif' },
 ];
 
-export default function SignaturePad({ onSignatureChange, initialSignature }: SignaturePadProps) {
+export default function SignaturePad({ onSignatureChange }: SignaturePadProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
-  const [mode, setMode] = useState<'draw' | 'type' | 'initials'>('draw');
+  const [mode, setMode] = useState<'draw' | 'type'>('draw');
   const [typedName, setTypedName] = useState('');
   const [selectedFont, setSelectedFont] = useState(SIGNATURE_FONTS[0]);
   const [showFontMenu, setShowFontMenu] = useState(false);
@@ -46,16 +45,7 @@ export default function SignaturePad({ onSignatureChange, initialSignature }: Si
     ctx.lineTo(rect.width - 20, rect.height - 30);
     ctx.stroke();
     ctx.setLineDash([]);
-
-    if (initialSignature) {
-      const img = new Image();
-      img.onload = () => {
-        ctx.drawImage(img, 0, 0, rect.width, rect.height);
-        setHasSignature(true);
-      };
-      img.src = initialSignature;
-    }
-  }, [initialSignature]);
+  }, []);
 
   const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
     if (mode !== 'draw') return;
@@ -137,14 +127,7 @@ export default function SignaturePad({ onSignatureChange, initialSignature }: Si
     onSignatureChange(null);
   };
 
-  const getInitials = (name: string): string => {
-    if (!name) return '';
-    const parts = name.trim().split(/\s+/);
-    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-    return parts.map(p => p.charAt(0).toUpperCase()).join('');
-  };
-
-  const renderTypedSignature = (name: string, isInitials: boolean = false) => {
+  const renderTypedSignature = (name: string) => {
     setTypedName(name);
 
     const canvas = canvasRef.current;
@@ -167,18 +150,12 @@ export default function SignaturePad({ onSignatureChange, initialSignature }: Si
     ctx.stroke();
     ctx.setLineDash([]);
 
-    const displayText = isInitials ? getInitials(name) : name;
-
-    if (displayText) {
-      if (isInitials) {
-        ctx.font = 'bold 48px "Times New Roman", serif';
-      } else {
-        ctx.font = selectedFont.value;
-      }
+    if (name) {
+      ctx.font = selectedFont.value;
       ctx.fillStyle = '#1e293b';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(displayText, rect.width / 2, rect.height / 2 - 10);
+      ctx.fillText(name, rect.width / 2, rect.height / 2 - 10);
       setHasSignature(true);
       saveSignature();
     } else {
@@ -188,14 +165,14 @@ export default function SignaturePad({ onSignatureChange, initialSignature }: Si
   };
 
   const handleTypedSignature = (name: string) => {
-    renderTypedSignature(name, mode === 'initials');
+    renderTypedSignature(name);
   };
 
   const handleFontChange = (font: typeof SIGNATURE_FONTS[0]) => {
     setSelectedFont(font);
     setShowFontMenu(false);
     if (typedName && mode === 'type') {
-      setTimeout(() => renderTypedSignature(typedName, false), 0);
+      setTimeout(() => renderTypedSignature(typedName), 0);
     }
   };
 
@@ -226,72 +203,58 @@ export default function SignaturePad({ onSignatureChange, initialSignature }: Si
           <Type className="w-4 h-4" />
           Type
         </button>
-        <button
-          type="button"
-          onClick={() => { setMode('initials'); clearSignature(); }}
-          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-            mode === 'initials'
-              ? 'bg-sky-100 text-sky-700'
-              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <span className="font-bold text-xs">AB</span>
-          Initials
-        </button>
       </div>
 
-      {(mode === 'type' || mode === 'initials') && (
+      {mode === 'type' && (
         <div className="space-y-3">
           <input
             type="text"
             value={typedName}
             onChange={(e) => handleTypedSignature(e.target.value)}
-            placeholder={mode === 'initials' ? "Type your full name for initials" : "Type your full name"}
+            placeholder="Type your full name"
             className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
           />
 
-          {mode === 'type' && (
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowFontMenu(!showFontMenu)}
-                className="flex items-center justify-between w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-              >
-                <span>Style: {selectedFont.name}</span>
-                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showFontMenu ? 'rotate-180' : ''}`} />
-              </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowFontMenu(!showFontMenu)}
+              className="flex items-center justify-between w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              <span>Style: {selectedFont.name}</span>
+              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showFontMenu ? 'rotate-180' : ''}`} />
+            </button>
 
-              {showFontMenu && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setShowFontMenu(false)} />
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-20 py-1 max-h-48 overflow-y-auto">
-                    {SIGNATURE_FONTS.map((font) => (
-                      <button
-                        key={font.name}
-                        type="button"
-                        onClick={() => handleFontChange(font)}
-                        className={`w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 transition-colors ${
-                          selectedFont.name === font.name ? 'bg-sky-50 text-sky-700' : 'text-slate-700'
-                        }`}
-                      >
-                        <span style={{ fontFamily: font.value.split('"')[1] || 'serif', fontStyle: 'italic' }}>
-                          {font.name}
+            {showFontMenu && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setShowFontMenu(false)} />
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-20 py-1 max-h-48 overflow-y-auto">
+                  {SIGNATURE_FONTS.map((font) => (
+                    <button
+                      key={font.name}
+                      type="button"
+                      onClick={() => handleFontChange(font)}
+                      className={`w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 transition-colors ${
+                        selectedFont.name === font.name ? 'bg-sky-50 text-sky-700' : 'text-slate-700'
+                      }`}
+                    >
+                      <span style={{ fontFamily: font.value.split('"')[1] || 'serif', fontStyle: 'italic' }}>
+                        {font.name}
+                      </span>
+                      {typedName && (
+                        <span
+                          className="block mt-1 text-slate-500"
+                          style={{ font: font.value.replace('32px', '18px').replace('30px', '18px').replace('28px', '18px').replace('26px', '18px') }}
+                        >
+                          {typedName}
                         </span>
-                        {typedName && (
-                          <span
-                            className="block mt-1 text-slate-500"
-                            style={{ font: font.value.replace('32px', '18px').replace('30px', '18px').replace('28px', '18px').replace('26px', '18px') }}
-                          >
-                            {typedName}
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
 

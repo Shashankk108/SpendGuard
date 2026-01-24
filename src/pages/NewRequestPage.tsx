@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   ChevronLeft,
   ChevronRight,
@@ -13,12 +13,24 @@ import {
   Building2,
   Calendar,
   Info,
+  CreditCard,
+  Ban,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import SignaturePad from '../components/SignaturePad';
 import { validatePurchaseRequest, getApprovalTier } from '../utils/validation';
 import type { ChecklistItem } from '../utils/validation';
+
+interface PCardUsage {
+  current_usage: number;
+  monthly_limit: number;
+  remaining: number;
+  utilization_percent: number;
+  hard_stop_enabled: boolean;
+  is_limit_reached: boolean;
+  month: string;
+}
 
 const CATEGORIES = [
   'Office Supplies',
@@ -71,10 +83,12 @@ export default function NewRequestPage() {
   const [signature, setSignature] = useState<string | null>(null);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [files, setFiles] = useState<File[]>([]);
+  const [pcardUsage, setPcardUsage] = useState<PCardUsage | null>(null);
+  const [loadingUsage, setLoadingUsage] = useState(true);
 
   const [formData, setFormData] = useState<FormData>({
     cardholder_name: '',
-    p_card_name: '',
+    p_card_name: 'IT',
     expense_date: new Date().toISOString().split('T')[0],
     vendor_name: '',
     vendor_location: '',
@@ -97,10 +111,21 @@ export default function NewRequestPage() {
       setFormData((prev) => ({
         ...prev,
         cardholder_name: profile.full_name || '',
-        p_card_name: profile.p_card_name || '',
       }));
     }
   }, [profile]);
+
+  useEffect(() => {
+    async function loadPcardUsage() {
+      setLoadingUsage(true);
+      const { data, error } = await supabase.rpc('get_pcard_monthly_usage');
+      if (!error && data) {
+        setPcardUsage(data as PCardUsage);
+      }
+      setLoadingUsage(false);
+    }
+    loadPcardUsage();
+  }, []);
 
   useEffect(() => {
     const totalAmount =
@@ -121,6 +146,12 @@ export default function NewRequestPage() {
 
   const totalAmount =
     formData.purchase_amount + formData.tax_amount + formData.shipping_amount;
+
+  const wouldExceedLimit = pcardUsage
+    ? (pcardUsage.current_usage + totalAmount) > pcardUsage.monthly_limit
+    : false;
+
+  const isBlocked = pcardUsage?.is_limit_reached && pcardUsage?.hard_stop_enabled;
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -228,12 +259,108 @@ export default function NewRequestPage() {
     }
   };
 
+  if (loadingUsage) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 text-sky-600 animate-spin" />
+      </div>
+    );
+  }
+
+  if (isBlocked) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-white rounded-2xl border border-red-200 shadow-lg overflow-hidden">
+          <div className="bg-red-50 px-6 py-8 text-center border-b border-red-200">
+            <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Ban className="w-10 h-10 text-red-600" />
+            </div>
+            <h1 className="text-2xl font-bold text-red-800">Monthly Spending Limit Reached</h1>
+            <p className="text-red-600 mt-2">New purchase requests are temporarily blocked</p>
+          </div>
+          <div className="p-6 space-y-6">
+            <div className="bg-slate-50 rounded-xl p-4 space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-600">Current Month Usage</span>
+                <span className="font-semibold text-slate-800">${pcardUsage?.current_usage.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-600">Monthly Limit</span>
+                <span className="font-semibold text-slate-800">${pcardUsage?.monthly_limit.toLocaleString()}</span>
+              </div>
+              <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
+                <div className="h-full bg-red-500" style={{ width: '100%' }} />
+              </div>
+              <p className="text-xs text-slate-500 text-center">100% of monthly limit used</p>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-amber-800">
+                  <p className="font-semibold mb-1">Why am I seeing this?</p>
+                  <p>The P-Card monthly spending limit of ${pcardUsage?.monthly_limit.toLocaleString()} has been reached. New purchase requests cannot be submitted until:</p>
+                  <ul className="list-disc list-inside mt-2 space-y-1 text-amber-700">
+                    <li>The monthly limit is increased by an administrator</li>
+                    <li>The monthly usage is reset</li>
+                    <li>A new billing month begins</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+            <div className="text-center space-y-4">
+              <p className="text-sm text-slate-600">Please contact your administrator or supervisor for assistance.</p>
+              <div className="flex justify-center gap-3">
+                <Link
+                  to="/dashboard"
+                  className="px-6 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200 transition-colors"
+                >
+                  Back to Dashboard
+                </Link>
+                <Link
+                  to="/my-requests"
+                  className="px-6 py-2.5 bg-sky-600 text-white rounded-xl font-medium hover:bg-sky-700 transition-colors"
+                >
+                  View My Requests
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-5xl mx-auto">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-slate-800">New Purchase Request</h1>
         <p className="text-slate-500 mt-1">P-Card Over $500 Purchase Approval Form</p>
       </div>
+
+      {pcardUsage && pcardUsage.utilization_percent >= 80 && !isBlocked && (
+        <div className={`mb-6 p-4 rounded-xl flex items-start gap-3 ${
+          pcardUsage.utilization_percent >= 95
+            ? 'bg-red-50 border border-red-200'
+            : 'bg-amber-50 border border-amber-200'
+        }`}>
+          <CreditCard className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
+            pcardUsage.utilization_percent >= 95 ? 'text-red-500' : 'text-amber-500'
+          }`} />
+          <div>
+            <p className={`text-sm font-semibold ${
+              pcardUsage.utilization_percent >= 95 ? 'text-red-800' : 'text-amber-800'
+            }`}>
+              {pcardUsage.utilization_percent >= 95 ? 'P-Card Almost at Limit!' : 'P-Card Usage Warning'}
+            </p>
+            <p className={`text-sm ${
+              pcardUsage.utilization_percent >= 95 ? 'text-red-700' : 'text-amber-700'
+            }`}>
+              ${pcardUsage.current_usage.toLocaleString()} of ${pcardUsage.monthly_limit.toLocaleString()} used ({pcardUsage.utilization_percent}%).
+              {pcardUsage.remaining > 0 && ` Only $${pcardUsage.remaining.toLocaleString()} remaining.`}
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-8">
         <div className="flex-1">
@@ -377,6 +504,17 @@ export default function NewRequestPage() {
               >
                 {getApprovalTier(totalAmount)}
               </div>
+              {pcardUsage && wouldExceedLimit && totalAmount > 0 && (
+                <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                    <div className="text-xs text-red-700">
+                      <p className="font-semibold">Exceeds Monthly Limit</p>
+                      <p>This would bring total to ${(pcardUsage.current_usage + totalAmount).toLocaleString()} (${(pcardUsage.current_usage + totalAmount - pcardUsage.monthly_limit).toLocaleString()} over limit)</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
@@ -429,7 +567,7 @@ function Step1CardholderInfo({
   return (
     <div className="space-y-6">
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-2">Cardholder Name</label>
+        <label className="block text-sm font-medium text-slate-700 mb-2">Full Name</label>
         <input
           type="text"
           name="cardholder_name"
@@ -440,16 +578,16 @@ function Step1CardholderInfo({
         />
       </div>
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-2">Name on P-Card</label>
+        <label className="block text-sm font-medium text-slate-700 mb-2">P-Card Name</label>
         <input
           type="text"
           name="p_card_name"
           value={formData.p_card_name}
           onChange={onChange}
           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 uppercase focus:outline-none focus:ring-2 focus:ring-sky-500"
-          required
+          readOnly
         />
-        <p className="mt-1.5 text-xs text-slate-500">Enter exactly as it appears on your card</p>
+        <p className="mt-1.5 text-xs text-slate-500">Company P-Card</p>
       </div>
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-2">Date of Expense</label>

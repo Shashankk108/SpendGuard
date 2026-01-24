@@ -168,7 +168,7 @@ export default function AllRequestsTab() {
     const headers = [
       'Date',
       'Vendor',
-      'Cardholder',
+      'Requestor',
       'Category',
       'Amount',
       'Status',

@@ -11,22 +11,29 @@ import {
   DollarSign,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import type { PurchaseRequest } from '../types/database';
 
 export default function MyRequestsPage() {
+  const { user } = useAuth();
   const [requests, setRequests] = useState<PurchaseRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
   useEffect(() => {
-    fetchRequests();
-  }, []);
+    if (user?.id) {
+      fetchRequests();
+    }
+  }, [user?.id]);
 
   async function fetchRequests() {
+    if (!user?.id) return;
+
     const { data, error } = await supabase
       .from('purchase_requests')
       .select('*')
+      .eq('requester_id', user.id)
       .order('created_at', { ascending: false });
 
     if (error) {

@@ -14,6 +14,7 @@ import {
   User,
   Database,
   BarChart3,
+  Receipt,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -29,6 +30,8 @@ export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [unseenUpdates, setUnseenUpdates] = useState(0);
+  const [pendingApprovals, setPendingApprovals] = useState(0);
+  const [reuploadRequests, setReuploadRequests] = useState(0);
 
   const isApprover = profile?.role === 'approver' || profile?.role === 'admin';
   const isAdmin = profile?.role === 'admin';
@@ -36,8 +39,12 @@ export default function Layout({ children }: LayoutProps) {
   useEffect(() => {
     if (user?.id) {
       checkUnseenUpdates();
+      checkReuploadRequests();
+      if (isApprover) {
+        checkPendingApprovals();
+      }
     }
-  }, [user?.id, location.pathname]);
+  }, [user?.id, location.pathname, isApprover]);
 
   async function checkUnseenUpdates() {
     if (!user?.id) return;
@@ -63,11 +70,38 @@ export default function Layout({ children }: LayoutProps) {
     }
   }
 
+  async function checkPendingApprovals() {
+    const { data, error } = await supabase
+      .from('purchase_requests')
+      .select('id')
+      .eq('status', 'pending');
+
+    if (!error && data) {
+      setPendingApprovals(data.length);
+    }
+  }
+
+  async function checkReuploadRequests() {
+    if (!user?.id) return;
+
+    const { data, error } = await supabase
+      .from('purchase_receipts')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('is_current', true)
+      .eq('reupload_requested', true);
+
+    if (!error && data) {
+      setReuploadRequests(data.length);
+    }
+  }
+
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'New Request', href: '/new-request', icon: FilePlus },
     { name: 'My Requests', href: '/my-requests', icon: FileText, badge: unseenUpdates },
-    ...(isApprover ? [{ name: 'Pending Approvals', href: '/approvals', icon: CheckSquare }] : []),
+    { name: 'My Receipts', href: '/my-receipts', icon: Receipt, badge: reuploadRequests, highlight: reuploadRequests > 0 },
+    ...(isApprover ? [{ name: 'Pending Approvals', href: '/approvals', icon: CheckSquare, badge: pendingApprovals, highlight: true }] : []),
     ...(isApprover ? [{ name: 'Leadership', href: '/leadership', icon: BarChart3 }] : []),
     ...(isAdmin ? [{ name: 'Admin', href: '/admin', icon: Database }] : []),
   ];
@@ -109,7 +143,8 @@ export default function Layout({ children }: LayoutProps) {
         <nav className="p-4 space-y-1">
           {navigation.map((item) => {
             const isActive = location.pathname === item.href;
-            const badge = 'badge' in item ? item.badge : 0;
+            const badge = 'badge' in item ? (item.badge as number) : 0;
+            const highlight = 'highlight' in item ? item.highlight : false;
             return (
               <Link
                 key={item.name}
@@ -122,12 +157,19 @@ export default function Layout({ children }: LayoutProps) {
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <item.icon className={`w-5 h-5 ${isActive ? 'text-emerald-600' : 'text-slate-400'}`} />
+                  <div className="relative">
+                    <item.icon className={`w-5 h-5 ${isActive ? 'text-emerald-600' : 'text-slate-400'}`} />
+                    {highlight && badge > 0 && (
+                      <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+                    )}
+                  </div>
                   {item.name}
                 </div>
                 {badge > 0 && (
-                  <span className="flex items-center justify-center min-w-5 h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full animate-pulse">
-                    {badge > 9 ? '9+' : badge}
+                  <span className={`flex items-center justify-center min-w-5 h-5 px-1.5 text-xs font-bold rounded-full ${
+                    highlight ? 'bg-red-500 text-white animate-pulse' : 'bg-red-500 text-white'
+                  }`}>
+                    {badge > 99 ? '99+' : badge}
                   </span>
                 )}
               </Link>

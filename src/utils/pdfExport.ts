@@ -113,7 +113,7 @@ export async function exportRequestToPDF(data: ExportData): Promise<void> {
 
   drawSectionHeader('Requester Information');
 
-  drawLabelValue('Cardholder Name', request.cardholder_name, true);
+  drawLabelValue('Requestor Name', request.cardholder_name, true);
   drawLabelValue('P-Card Name', request.p_card_name, true, true);
   y += 6;
 
