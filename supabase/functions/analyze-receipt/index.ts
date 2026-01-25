@@ -229,37 +229,49 @@ async function analyzeWithOpenAI(
   imageUrl: string,
   purchaseRequest: PurchaseRequest
 ): Promise<{ analysis?: AnalysisResult; error?: string; openai_error?: unknown }> {
-  const systemPrompt = `You are an expert receipt/invoice analyzer. Analyze the receipt image and extract information.
+  const systemPrompt = `You are an expert receipt/invoice analyzer. Your job is to ACCURATELY extract information EXACTLY as shown on the receipt image.
 
-EXTRACTION TASK:
-1. VENDOR: Find the business/store name (usually at top or on logo)
-2. TOTAL: Find the final total amount (look for "Total", "Grand Total", "Amount Due")
-3. DATE: Find the transaction/purchase date
-4. ITEMS: List purchased items with prices
+CRITICAL EXTRACTION RULES:
+1. VENDOR: Extract the EXACT business/store name as printed (usually at top, on logo, or header)
+2. TOTAL: Find the EXACT final total amount (look for "Total", "Grand Total", "Amount Due", "TOTAL")
+3. DATE EXTRACTION (MOST IMPORTANT - READ CAREFULLY):
+   - Look for the main receipt/transaction date on the document
+   - Common labels: "Receipt Date:", "Date:", "Transaction Date:", "Invoice Date:", or just a date near the top
+   - Read the EXACT day, month, and year shown
+   - If you see "01/25/2026" - this is January 25, 2026 (not January 24!)
+   - If you see "01/24/2026" - this is January 24, 2026
+   - If you see "Receipt Date: 01/25/2026" - extract January 25, 2026
+   - DO NOT subtract or add days
+   - DO NOT use today's date or any assumed date
+   - Convert to YYYY-MM-DD format: "01/25/2026" becomes "2026-01-25"
+   - TRIPLE CHECK: If the receipt says 25, extract 25 (not 24 or 26)
+4. ITEMS: List all purchased items with their prices
 
-PURCHASE REQUEST CONTEXT:
+PURCHASE REQUEST CONTEXT (for comparison):
 - Expected Vendor: ${purchaseRequest.vendor_name}
 - Expected Amount: $${purchaseRequest.total_amount.toFixed(2)}
 - Expected Date: ${purchaseRequest.expense_date}
 
 MATCHING RULES:
-- Vendor MATCHES if names are similar (ignore case, punctuation)
-- Amount MATCHES if within 10% or $5
-- Date MATCHES if within 30 days
+- Vendor MATCHES if names are similar (ignore case, punctuation, "Inc", "LLC", etc.)
+- Amount MATCHES if within 2% or $2 difference
+- Date MATCHES if within 7 days of expected date
+
+CRITICAL WARNING: Extract dates EXACTLY as shown. If receipt shows 01/25/2026, you must return "2026-01-25". Do not modify the day number.
 
 Respond with ONLY valid JSON:
 {
-  "extracted_vendor": "vendor name or null",
-  "extracted_amount": number or null,
+  "extracted_vendor": "exact vendor name or null",
+  "extracted_amount": exact_number or null,
   "extracted_date": "YYYY-MM-DD or null",
-  "extracted_items": [{"description": "item", "amount": 0.00}],
+  "extracted_items": [{"description": "item name", "amount": 0.00}],
   "confidence_score": 0-100,
   "vendor_match": true/false,
   "amount_match": true/false,
   "date_match": true/false,
-  "vendor_reason": "explanation",
-  "amount_reason": "explanation",
-  "date_reason": "explanation",
+  "vendor_reason": "explanation with extracted vs expected",
+  "amount_reason": "explanation with extracted vs expected",
+  "date_reason": "explanation with extracted date vs expected date",
   "analysis_notes": "summary of findings"
 }`;
 
@@ -332,17 +344,54 @@ Respond with ONLY valid JSON:
 
     const parsed = JSON.parse(content);
 
-    const vendorMatch = parsed.vendor_match ?? checkVendorMatch(parsed.extracted_vendor, purchaseRequest.vendor_name);
-    const amountMatch = parsed.amount_match ?? checkAmountMatch(parsed.extracted_amount, purchaseRequest.total_amount);
-    const dateMatch = parsed.date_match ?? checkDateMatch(parsed.extracted_date, purchaseRequest.expense_date);
+    const vendorMatch = checkVendorMatch(parsed.extracted_vendor, purchaseRequest.vendor_name);
+    const amountMatch = checkAmountMatch(parsed.extracted_amount, purchaseRequest.total_amount);
+    const dateMatch = checkDateMatch(parsed.extracted_date, purchaseRequest.expense_date);
+    const dateDiff = getDateDifferenceInDays(parsed.extracted_date, purchaseRequest.expense_date);
+    const isExactDateMatch = dateDiff !== null && dateDiff === 0;
 
+    const concerns: string[] = [];
+    const matchCount = [vendorMatch, amountMatch, dateMatch].filter(Boolean).length;
+    let confidence: number;
     let recommendation: "approve" | "review" | "reject" = "review";
-    const confidence = Math.min(100, Math.max(0, Number(parsed.confidence_score) || 50));
 
-    if (vendorMatch && amountMatch && dateMatch && confidence >= 60) {
+    if (matchCount === 3) {
+      confidence = 95;
       recommendation = "approve";
-    } else if (!vendorMatch && !amountMatch && confidence >= 60) {
+      if (!isExactDateMatch && dateDiff !== null) {
+        concerns.push(`Receipt date is ${Math.abs(dateDiff)} day${Math.abs(dateDiff) > 1 ? 's' : ''} ${dateDiff > 0 ? 'after' : 'before'} the expected purchase date, but within acceptable tolerance.`);
+      }
+    } else if (matchCount === 2) {
+      if (vendorMatch && amountMatch) {
+        confidence = 75;
+        if (!dateMatch) {
+          concerns.push(`Date mismatch: Receipt shows ${parsed.extracted_date || 'unknown'}, expected ${purchaseRequest.expense_date}.`);
+        }
+      } else if (vendorMatch && dateMatch) {
+        confidence = 60;
+        concerns.push(`Amount mismatch: Receipt shows $${parsed.extracted_amount?.toFixed(2) || 'unknown'}, expected $${purchaseRequest.total_amount.toFixed(2)}.`);
+      } else {
+        confidence = 50;
+        concerns.push(`Vendor mismatch: Receipt shows "${parsed.extracted_vendor || 'unknown'}", expected "${purchaseRequest.vendor_name}".`);
+      }
+      recommendation = "review";
+    } else if (matchCount === 1) {
+      confidence = 30;
+      recommendation = "review";
+      if (!vendorMatch) concerns.push(`Vendor does not match expected "${purchaseRequest.vendor_name}".`);
+      if (!amountMatch) concerns.push(`Amount does not match expected $${purchaseRequest.total_amount.toFixed(2)}.`);
+      if (!dateMatch) concerns.push(`Date does not match expected ${purchaseRequest.expense_date}.`);
+    } else {
+      confidence = 15;
       recommendation = "reject";
+      concerns.push("No verification checks passed. This receipt may not match the purchase request.");
+    }
+
+    if (!vendorMatch && !amountMatch) {
+      recommendation = "reject";
+      if (!concerns.some(c => c.includes("may not match"))) {
+        concerns.push("Both vendor and amount do not match - this receipt likely belongs to a different purchase.");
+      }
     }
 
     return {
@@ -356,12 +405,13 @@ Respond with ONLY valid JSON:
         date_match: dateMatch,
         vendor_reason: parsed.vendor_reason || generateReason("vendor", parsed.extracted_vendor, purchaseRequest.vendor_name, vendorMatch),
         amount_reason: parsed.amount_reason || generateReason("amount", parsed.extracted_amount, purchaseRequest.total_amount, amountMatch),
-        date_reason: parsed.date_reason || generateReason("date", parsed.extracted_date, purchaseRequest.expense_date, dateMatch),
+        date_reason: generateDateReason(parsed.extracted_date, purchaseRequest.expense_date, dateMatch, dateDiff),
         expected_vendor: purchaseRequest.vendor_name,
         expected_amount: purchaseRequest.total_amount,
         expected_date: purchaseRequest.expense_date,
         confidence_score: confidence,
         recommendation,
+        concerns,
         analysis_notes: parsed.analysis_notes || "Analysis complete.",
         raw_extraction: { openai_response: parsed },
       }
@@ -386,18 +436,24 @@ function checkVendorMatch(extracted: string | null, expected: string): boolean {
 function checkAmountMatch(extracted: number | null, expected: number): boolean {
   if (extracted == null) return false;
   const diff = Math.abs(extracted - expected);
-  return (diff / expected) * 100 <= 10 || diff <= 5;
+  return (diff / expected) * 100 <= 2 || diff <= 2;
+}
+
+function getDateDifferenceInDays(extracted: string | null, expected: string): number | null {
+  if (!extracted) return null;
+  try {
+    const e = new Date(extracted + 'T00:00:00');
+    const x = new Date(expected + 'T00:00:00');
+    return Math.round((e.getTime() - x.getTime()) / (1000 * 60 * 60 * 24));
+  } catch {
+    return null;
+  }
 }
 
 function checkDateMatch(extracted: string | null, expected: string): boolean {
-  if (!extracted) return false;
-  try {
-    const e = new Date(extracted);
-    const x = new Date(expected);
-    return Math.abs(e.getTime() - x.getTime()) / (1000 * 60 * 60 * 24) <= 30;
-  } catch {
-    return false;
-  }
+  const diff = getDateDifferenceInDays(extracted, expected);
+  if (diff === null) return false;
+  return Math.abs(diff) <= 1;
 }
 
 function generateReason(type: string, extracted: unknown, expected: unknown, match: boolean): string {
@@ -408,6 +464,24 @@ function generateReason(type: string, extracted: unknown, expected: unknown, mat
     return `${type.charAt(0).toUpperCase() + type.slice(1)} matches expected value.`;
   }
   return `${type.charAt(0).toUpperCase() + type.slice(1)} "${extracted}" differs from expected "${expected}".`;
+}
+
+function generateDateReason(extracted: string | null, expected: string, match: boolean, dateDiff: number | null): string {
+  if (extracted == null) {
+    return `Could not extract date from receipt. Expected: ${expected}.`;
+  }
+  if (dateDiff === 0) {
+    return `Extracted date ${extracted} matches expected date ${expected}.`;
+  }
+  if (dateDiff !== null && Math.abs(dateDiff) === 1) {
+    const direction = dateDiff > 0 ? 'after' : 'before';
+    return `Extracted date ${extracted} is 1 day ${direction} expected date ${expected}. Close match within tolerance.`;
+  }
+  if (dateDiff !== null) {
+    const direction = dateDiff > 0 ? 'after' : 'before';
+    return `Extracted date ${extracted} is ${Math.abs(dateDiff)} days ${direction} expected date ${expected}. Does not match.`;
+  }
+  return `Date "${extracted}" differs from expected "${expected}".`;
 }
 
 function createFallbackAnalysis(pr: PurchaseRequest, note?: string): AnalysisResult {
@@ -427,6 +501,7 @@ function createFallbackAnalysis(pr: PurchaseRequest, note?: string): AnalysisRes
     expected_date: pr.expense_date,
     confidence_score: 0,
     recommendation: "review",
+    concerns: ["Automated analysis could not extract receipt details. Manual review required."],
     analysis_notes: note || "Automated analysis could not be completed. Please review manually.",
     raw_extraction: {},
   };

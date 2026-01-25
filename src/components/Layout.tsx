@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import NotificationBell from './NotificationBell';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -204,7 +205,11 @@ export default function Layout({ children }: LayoutProps) {
 
             <div className="flex-1" />
 
-            <div className="relative">
+            <div className="flex items-center gap-2">
+              <NotificationBell />
+            </div>
+
+            <div className="relative ml-2">
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
                 className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-slate-100 transition-colors"

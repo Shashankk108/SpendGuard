@@ -230,10 +230,10 @@ export default function OverviewTab({ onNavigateToReceipts }: OverviewTabProps) 
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 overflow-hidden">
       {(receiptStats.pendingReview > 0 || receiptStats.needsInfo > 0) && (
-        <div className="bg-gradient-to-r from-sky-50 via-cyan-50 to-teal-50 border-2 border-sky-200 rounded-2xl p-5">
-          <div className="flex items-start justify-between gap-4">
+        <div className="bg-gradient-to-r from-sky-50 via-cyan-50 to-teal-50 border-2 border-sky-200 rounded-2xl p-5 overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="flex items-start gap-4">
               <div className="w-12 h-12 bg-sky-100 rounded-xl flex items-center justify-center flex-shrink-0">
                 <Receipt className="w-6 h-6 text-sky-600" />
@@ -257,18 +257,18 @@ export default function OverviewTab({ onNavigateToReceipts }: OverviewTabProps) 
                   )}
                 </div>
                 {receiptStats.recentUploads.length > 0 && (
-                  <div className="space-y-2">
+                  <div className="space-y-2 max-w-full overflow-hidden">
                     <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Recent Uploads</p>
                     {receiptStats.recentUploads.slice(0, 3).map(receipt => (
-                      <div key={receipt.id} className="flex items-center gap-3 bg-white/60 rounded-lg px-3 py-2">
+                      <div key={receipt.id} className="flex items-center gap-3 bg-white/60 rounded-lg px-3 py-2 max-w-full">
                         <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center flex-shrink-0">
                           <Receipt className="w-4 h-4 text-slate-500" />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-slate-800 truncate">{receipt.vendor_name}</p>
-                          <p className="text-xs text-slate-500">{receipt.uploader_name} - ${receipt.total_amount.toLocaleString()}</p>
+                        <div className="flex-1 min-w-0 overflow-hidden">
+                          <p className="text-sm font-medium text-slate-800 truncate max-w-[200px] sm:max-w-[300px] lg:max-w-[400px]">{receipt.vendor_name}</p>
+                          <p className="text-xs text-slate-500 truncate">{receipt.uploader_name} - ${receipt.total_amount.toLocaleString()}</p>
                         </div>
-                        <span className="text-[10px] text-slate-400 flex-shrink-0">{formatTimeAgo(receipt.uploaded_at)}</span>
+                        <span className="text-[10px] text-slate-400 flex-shrink-0 hidden sm:block">{formatTimeAgo(receipt.uploaded_at)}</span>
                       </div>
                     ))}
                   </div>
@@ -288,11 +288,11 @@ export default function OverviewTab({ onNavigateToReceipts }: OverviewTabProps) 
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        <div className="lg:col-span-1">
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
+        <div className="xl:col-span-1">
           <PCardWidget />
         </div>
-        <div className="lg:col-span-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="xl:col-span-4 grid grid-cols-2 lg:grid-cols-4 gap-4">
           {statCards.map((card) => (
             <div
               key={card.label}
@@ -342,7 +342,7 @@ export default function OverviewTab({ onNavigateToReceipts }: OverviewTabProps) 
           </div>
         </div>
 
-        <div className="bg-slate-50 rounded-xl p-5 border border-slate-100">
+        <div className="bg-slate-50 rounded-xl p-5 border border-slate-100 overflow-hidden">
           <h3 className="text-sm font-semibold text-slate-800 mb-4">
             Spending by Category
           </h3>
@@ -351,14 +351,14 @@ export default function OverviewTab({ onNavigateToReceipts }: OverviewTabProps) 
               <PieChart>
                 <Pie
                   data={stats.categoryBreakdown}
-                  cx="50%"
+                  cx="40%"
                   cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
+                  innerRadius={40}
+                  outerRadius={70}
                   paddingAngle={2}
                   dataKey="value"
                   label={({ name, percent }) =>
-                    `${name} (${(percent * 100).toFixed(0)}%)`
+                    `${name.length > 12 ? name.slice(0, 12) + '...' : name} (${(percent * 100).toFixed(0)}%)`
                   }
                   labelLine={false}
                 >

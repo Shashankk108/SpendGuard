@@ -36,6 +36,11 @@ export async function exportMasterSpreadsheet(): Promise<void> {
     .select('*')
     .order('created_at', { ascending: false });
 
+  const { data: godaddyOrders } = await supabase
+    .from('godaddy_orders')
+    .select('*')
+    .order('order_date', { ascending: false });
+
   const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
 
   const signatureMap = new Map<string, any[]>();
@@ -404,6 +409,82 @@ export async function exportMasterSpreadsheet(): Promise<void> {
         'Avg Amount': d.avgAmount,
         'Percentage': `${Math.round((d.count / turnaroundData.reduce((sum, x) => sum + x.count, 0) || 1) * 100)}%`,
       })),
+    });
+  }
+
+  if (godaddyOrders && godaddyOrders.length > 0) {
+    const requestMap = new Map(requests?.map(r => [r.id, r]) || []);
+
+    sheets.push({
+      name: 'GoDaddy Orders',
+      data: godaddyOrders.map(o => {
+        const matchedRequest = o.matched_request_id ? requestMap.get(o.matched_request_id) : null;
+        return {
+          'Order ID': o.order_id,
+          'Product/Domain': o.domain_or_product,
+          'Product Type': o.product_type || 'other',
+          'Order Date': new Date(o.order_date).toLocaleDateString(),
+          'Total Amount': o.order_total,
+          'Currency': o.currency,
+          'Sync Status': o.sync_status,
+          'Matched Request ID': o.matched_request_id ? o.matched_request_id.substring(0, 8).toUpperCase() : '-',
+          'Match Confidence': o.match_confidence ? `${o.match_confidence}%` : '-',
+          'Match Reasons': o.match_reasons?.join('; ') || '-',
+          'Linked Vendor': matchedRequest?.vendor_name || '-',
+          'Linked Amount': matchedRequest?.total_amount || '-',
+          'Synced At': o.synced_at ? new Date(o.synced_at).toLocaleString() : '-',
+          'Created At': new Date(o.created_at).toLocaleDateString(),
+        };
+      }),
+    });
+
+    const productTypeStats = new Map<string, { count: number; total: number }>();
+    godaddyOrders.forEach(o => {
+      const type = o.product_type || 'other';
+      const existing = productTypeStats.get(type) || { count: 0, total: 0 };
+      existing.count++;
+      existing.total += o.order_total;
+      productTypeStats.set(type, existing);
+    });
+
+    const totalGodaddySpend = godaddyOrders.reduce((sum, o) => sum + o.order_total, 0);
+
+    sheets.push({
+      name: 'GoDaddy Summary',
+      data: [
+        {
+          'Metric': 'Total Orders',
+          'Value': godaddyOrders.length,
+        },
+        {
+          'Metric': 'Total Spend',
+          'Value': totalGodaddySpend.toFixed(2),
+        },
+        {
+          'Metric': 'Average Order Value',
+          'Value': godaddyOrders.length > 0 ? (totalGodaddySpend / godaddyOrders.length).toFixed(2) : 0,
+        },
+        {
+          'Metric': 'Matched Orders',
+          'Value': godaddyOrders.filter(o => o.sync_status === 'matched').length,
+        },
+        {
+          'Metric': 'Unmatched Orders',
+          'Value': godaddyOrders.filter(o => o.sync_status === 'unmatched').length,
+        },
+        {
+          'Metric': 'Match Rate',
+          'Value': `${godaddyOrders.length > 0 ? Math.round((godaddyOrders.filter(o => o.sync_status === 'matched').length / godaddyOrders.length) * 100) : 0}%`,
+        },
+        ...Array.from(productTypeStats.entries()).map(([type, data]) => ({
+          'Metric': `${type.charAt(0).toUpperCase() + type.slice(1)} Orders`,
+          'Value': data.count,
+        })),
+        ...Array.from(productTypeStats.entries()).map(([type, data]) => ({
+          'Metric': `${type.charAt(0).toUpperCase() + type.slice(1)} Spend`,
+          'Value': data.total.toFixed(2),
+        })),
+      ],
     });
   }
 

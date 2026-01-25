@@ -15,6 +15,7 @@ import {
   Info,
   CreditCard,
   Ban,
+  Globe,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -73,6 +74,8 @@ interface FormData {
   is_software_subscription: boolean;
   it_license_confirmed: boolean;
   is_preferred_vendor: boolean;
+  vendor_type: string;
+  external_order_id: string;
 }
 
 export default function NewRequestPage() {
@@ -104,6 +107,8 @@ export default function NewRequestPage() {
     is_software_subscription: false,
     it_license_confirmed: false,
     is_preferred_vendor: false,
+    vendor_type: 'standard',
+    external_order_id: '',
   });
 
   useEffect(() => {
@@ -241,6 +246,9 @@ export default function NewRequestPage() {
           is_software_subscription: formData.is_software_subscription,
           it_license_confirmed: formData.it_license_confirmed,
           is_preferred_vendor: formData.is_preferred_vendor,
+          vendor_type: formData.vendor_type,
+          external_order_id: formData.external_order_id || null,
+          external_receipt_status: formData.vendor_type === 'godaddy' ? 'pending' : 'manual',
           status: totalAmount <= 500 ? 'approved' : 'pending',
           employee_signature_url: signature,
           employee_signed_at: new Date().toISOString(),
@@ -409,6 +417,9 @@ export default function NewRequestPage() {
                 onChange={handleInputChange}
                 onCheckboxChange={handleCheckboxChange}
                 totalAmount={totalAmount}
+                onVendorTypeChange={(vendorType) =>
+                  setFormData((prev) => ({ ...prev, vendor_type: vendorType }))
+                }
               />
             )}
             {currentStep === 3 && (
@@ -612,15 +623,28 @@ function Step2PurchaseDetails({
   onChange,
   onCheckboxChange,
   totalAmount,
+  onVendorTypeChange,
 }: {
   formData: FormData;
   onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
   onCheckboxChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   totalAmount: number;
+  onVendorTypeChange: (vendorType: string) => void;
 }) {
   const isProhibited = ['Technology Hardware', 'Travel - Air', 'Travel - Rail', 'Gift Cards'].includes(
     formData.category
   );
+
+  const isGoDaddyVendor = formData.vendor_name.toLowerCase().includes('godaddy') ||
+    formData.vendor_name.toLowerCase().includes('go daddy');
+
+  useEffect(() => {
+    if (isGoDaddyVendor && formData.vendor_type !== 'godaddy') {
+      onVendorTypeChange('godaddy');
+    } else if (!isGoDaddyVendor && formData.vendor_type === 'godaddy') {
+      onVendorTypeChange('standard');
+    }
+  }, [formData.vendor_name, isGoDaddyVendor, formData.vendor_type, onVendorTypeChange]);
 
   return (
     <div className="space-y-6">
@@ -639,6 +663,38 @@ function Step2PurchaseDetails({
             />
           </div>
         </div>
+
+        {isGoDaddyVendor && (
+          <div className="col-span-2">
+            <div className="p-4 bg-teal-50 border border-teal-200 rounded-xl">
+              <div className="flex items-start gap-3">
+                <Globe className="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-teal-800">GoDaddy Purchase Detected</p>
+                  <p className="text-xs text-teal-600 mt-1">
+                    Receipts for GoDaddy purchases are automatically imported after approval. No manual receipt upload needed.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="mt-3">
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                GoDaddy Order ID <span className="text-slate-400 font-normal">(optional)</span>
+              </label>
+              <input
+                type="text"
+                name="external_order_id"
+                value={formData.external_order_id}
+                onChange={onChange}
+                placeholder="Enter if you already have an order ID"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                If known, this helps match your purchase faster
+              </p>
+            </div>
+          </div>
+        )}
         <div className="col-span-2">
           <label className="block text-sm font-medium text-slate-700 mb-2">
             Vendor Location (City/State)

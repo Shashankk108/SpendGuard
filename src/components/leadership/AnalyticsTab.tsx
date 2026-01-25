@@ -6,6 +6,7 @@ import {
   Calendar,
   Download,
   ChevronDown,
+  Globe,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { PurchaseRequest, Profile } from '../../types/database';
@@ -28,6 +29,17 @@ import {
 type DateRange = 'this_month' | 'last_month' | 'this_quarter' | 'ytd' | 'last_year' | 'all';
 
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+
+interface GoDaddyOrder {
+  id: string;
+  order_id: string;
+  domain_or_product: string;
+  product_type: string | null;
+  order_date: string;
+  order_total: number;
+  currency: string;
+  sync_status: string;
+}
 
 interface EmployeeStats {
   name: string;
@@ -55,22 +67,25 @@ interface CategoryStats {
 export default function AnalyticsTab() {
   const [requests, setRequests] = useState<PurchaseRequest[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [godaddyOrders, setGodaddyOrders] = useState<GoDaddyOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange>('ytd');
-  const [activeView, setActiveView] = useState<'employees' | 'vendors' | 'categories' | 'trends'>('employees');
+  const [activeView, setActiveView] = useState<'employees' | 'vendors' | 'categories' | 'trends' | 'godaddy'>('employees');
 
   useEffect(() => {
     fetchData();
   }, []);
 
   async function fetchData() {
-    const [{ data: requestsData }, { data: profilesData }] = await Promise.all([
+    const [{ data: requestsData }, { data: profilesData }, { data: godaddyData }] = await Promise.all([
       supabase.from('purchase_requests').select('*'),
       supabase.from('profiles').select('*'),
+      supabase.from('godaddy_orders').select('*').order('order_date', { ascending: false }),
     ]);
 
     setRequests(requestsData || []);
     setProfiles(profilesData || []);
+    setGodaddyOrders(godaddyData || []);
     setLoading(false);
   }
 
@@ -232,6 +247,88 @@ export default function AnalyticsTab() {
     return Math.round((preferredCount / approved.length) * 100);
   }, [filteredRequests]);
 
+  const filteredGodaddyOrders = useMemo(() => {
+    const now = new Date();
+    let startDate: Date;
+
+    switch (dateRange) {
+      case 'this_month':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      case 'last_month':
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+        return godaddyOrders.filter((o) => {
+          const d = new Date(o.order_date);
+          return d >= startDate && d <= endOfLastMonth;
+        });
+      case 'this_quarter':
+        const quarter = Math.floor(now.getMonth() / 3);
+        startDate = new Date(now.getFullYear(), quarter * 3, 1);
+        break;
+      case 'ytd':
+        startDate = new Date(now.getFullYear(), 0, 1);
+        break;
+      case 'last_year':
+        startDate = new Date(now.getFullYear() - 1, 0, 1);
+        const endOfLastYear = new Date(now.getFullYear() - 1, 11, 31);
+        return godaddyOrders.filter((o) => {
+          const d = new Date(o.order_date);
+          return d >= startDate && d <= endOfLastYear;
+        });
+      case 'all':
+      default:
+        return godaddyOrders;
+    }
+
+    return godaddyOrders.filter((o) => new Date(o.order_date) >= startDate);
+  }, [godaddyOrders, dateRange]);
+
+  const godaddyStats = useMemo(() => {
+    const totalSpend = filteredGodaddyOrders.reduce((sum, o) => sum + o.order_total, 0);
+    const matched = filteredGodaddyOrders.filter((o) => o.sync_status === 'matched').length;
+    const unmatched = filteredGodaddyOrders.filter((o) => o.sync_status === 'unmatched').length;
+
+    const byProductType = new Map<string, { count: number; total: number }>();
+    filteredGodaddyOrders.forEach((o) => {
+      const type = o.product_type || 'other';
+      const existing = byProductType.get(type) || { count: 0, total: 0 };
+      existing.count++;
+      existing.total += o.order_total;
+      byProductType.set(type, existing);
+    });
+
+    const monthlySpend = new Map<string, number>();
+    filteredGodaddyOrders.forEach((o) => {
+      const d = new Date(o.order_date);
+      const monthKey = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+      monthlySpend.set(monthKey, (monthlySpend.get(monthKey) || 0) + o.order_total);
+    });
+
+    const last12Months: { month: string; spend: number }[] = [];
+    const now = new Date();
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthKey = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+      last12Months.push({ month: monthKey, spend: monthlySpend.get(monthKey) || 0 });
+    }
+
+    return {
+      totalOrders: filteredGodaddyOrders.length,
+      totalSpend,
+      avgOrderValue: filteredGodaddyOrders.length > 0 ? totalSpend / filteredGodaddyOrders.length : 0,
+      matched,
+      unmatched,
+      matchRate: filteredGodaddyOrders.length > 0 ? Math.round((matched / filteredGodaddyOrders.length) * 100) : 0,
+      byProductType: Array.from(byProductType.entries()).map(([type, data]) => ({
+        type: type.charAt(0).toUpperCase() + type.slice(1),
+        count: data.count,
+        total: data.total,
+      })).sort((a, b) => b.total - a.total),
+      monthlyTrend: last12Months,
+    };
+  }, [filteredGodaddyOrders]);
+
   function exportData() {
     let data: Record<string, unknown>[];
     let filename: string;
@@ -248,6 +345,18 @@ export default function AnalyticsTab() {
       case 'categories':
         data = categoryStats;
         filename = 'category-spending';
+        break;
+      case 'godaddy':
+        data = filteredGodaddyOrders.map(o => ({
+          'Order ID': o.order_id,
+          'Product': o.domain_or_product,
+          'Type': o.product_type || 'other',
+          'Amount': o.order_total,
+          'Currency': o.currency,
+          'Date': new Date(o.order_date).toLocaleDateString(),
+          'Status': o.sync_status,
+        }));
+        filename = 'godaddy-orders';
         break;
       default:
         data = monthlyTrend;
@@ -282,6 +391,7 @@ export default function AnalyticsTab() {
     { id: 'vendors', label: 'By Vendor', icon: Building2 },
     { id: 'categories', label: 'By Category', icon: Tag },
     { id: 'trends', label: 'Trends', icon: Calendar },
+    { id: 'godaddy', label: 'GoDaddy', icon: Globe },
   ] as const;
 
   return (
@@ -699,6 +809,154 @@ export default function AnalyticsTab() {
                 ${monthlyTrend.reduce((sum, m) => sum + m.rejected, 0).toLocaleString()}
               </p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {activeView === 'godaddy' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-teal-50 border border-teal-200 rounded-xl p-5">
+              <div className="flex items-center gap-2 mb-2">
+                <Globe className="w-5 h-5 text-teal-600" />
+                <p className="text-sm text-teal-700 font-medium">Total GoDaddy Spend</p>
+              </div>
+              <p className="text-2xl font-bold text-teal-800">
+                ${godaddyStats.totalSpend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+              <p className="text-xs text-teal-600 mt-1">{godaddyStats.totalOrders} orders</p>
+            </div>
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-5">
+              <p className="text-sm text-slate-600 font-medium mb-2">Avg Order Value</p>
+              <p className="text-2xl font-bold text-slate-800">
+                ${godaddyStats.avgOrderValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </p>
+            </div>
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5">
+              <p className="text-sm text-emerald-700 font-medium mb-2">Matched Orders</p>
+              <p className="text-2xl font-bold text-emerald-800">{godaddyStats.matched}</p>
+              <p className="text-xs text-emerald-600 mt-1">{godaddyStats.matchRate}% match rate</p>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
+              <p className="text-sm text-amber-700 font-medium mb-2">Unmatched Orders</p>
+              <p className="text-2xl font-bold text-amber-800">{godaddyStats.unmatched}</p>
+              <p className="text-xs text-amber-600 mt-1">Need manual linking</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-slate-50 rounded-xl p-5 border border-slate-100">
+              <h3 className="text-sm font-semibold text-slate-800 mb-4">GoDaddy Spending by Month</h3>
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={godaddyStats.monthlyTrend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="#94a3b8" />
+                    <YAxis
+                      tick={{ fontSize: 12 }}
+                      stroke="#94a3b8"
+                      tickFormatter={(v) => `$${v.toFixed(0)}`}
+                    />
+                    <Tooltip
+                      formatter={(value: number) => [`$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 'Spend']}
+                      contentStyle={{
+                        backgroundColor: '#fff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                      }}
+                    />
+                    <Bar dataKey="spend" fill="#0d9488" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 rounded-xl p-5 border border-slate-100">
+              <h3 className="text-sm font-semibold text-slate-800 mb-4">Spending by Product Type</h3>
+              <div className="h-72">
+                {godaddyStats.byProductType.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={godaddyStats.byProductType}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={40}
+                        outerRadius={80}
+                        paddingAngle={2}
+                        dataKey="total"
+                        nameKey="type"
+                      >
+                        {godaddyStats.byProductType.map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value: number) => [`$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 'Total']}
+                        contentStyle={{
+                          backgroundColor: '#fff',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                        }}
+                      />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-slate-400">
+                    No GoDaddy orders in selected period
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-200">
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-slate-500 uppercase">
+                    Product Type
+                  </th>
+                  <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase">
+                    Orders
+                  </th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500 uppercase">
+                    Total Spend
+                  </th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500 uppercase">
+                    Avg Order
+                  </th>
+                  <th className="text-center py-3 px-4 text-xs font-semibold text-slate-500 uppercase">
+                    % of Total
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {godaddyStats.byProductType.map((item) => (
+                  <tr key={item.type} className="hover:bg-slate-50">
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-2">
+                        <Globe className="w-4 h-4 text-teal-500" />
+                        <span className="text-sm font-medium text-slate-800">{item.type}</span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 text-sm text-slate-600 text-center">{item.count}</td>
+                    <td className="py-3 px-4 text-sm font-semibold text-slate-800 text-right">
+                      ${item.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-slate-600 text-right">
+                      ${(item.count > 0 ? item.total / item.count : 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <span className="px-2 py-0.5 bg-teal-100 text-teal-700 rounded-full text-xs font-medium">
+                        {godaddyStats.totalSpend > 0 ? Math.round((item.total / godaddyStats.totalSpend) * 100) : 0}%
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

@@ -19,6 +19,7 @@ import {
   TrendingUp,
   ChevronDown,
   RefreshCw,
+  Globe,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -50,6 +51,10 @@ export default function DashboardPage() {
     total: 0,
     totalAmount: 0,
   });
+  const [godaddyStats, setGodaddyStats] = useState({
+    unmatched: 0,
+    pendingReceipts: 0,
+  });
   const [receiptsNeeded, setReceiptsNeeded] = useState<PurchaseWithReceipt[]>([]);
   const [reuploadRequests, setReuploadRequests] = useState<{id: string; vendor_name: string; total_amount: number; reason: string | null}[]>([]);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
@@ -66,6 +71,31 @@ export default function DashboardPage() {
       fetchReuploadRequests();
     }
   }, [user?.id]);
+
+  useEffect(() => {
+    if (isApprover) {
+      fetchGodaddyStats();
+    }
+  }, [isApprover]);
+
+  async function fetchGodaddyStats() {
+    const [unmatchedResult, pendingResult] = await Promise.all([
+      supabase
+        .from('godaddy_orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('sync_status', 'unmatched'),
+      supabase
+        .from('purchase_requests')
+        .select('id', { count: 'exact', head: true })
+        .eq('vendor_type', 'godaddy')
+        .eq('external_receipt_status', 'pending'),
+    ]);
+
+    setGodaddyStats({
+      unmatched: unmatchedResult.count || 0,
+      pendingReceipts: pendingResult.count || 0,
+    });
+  }
 
   async function fetchReuploadRequests() {
     if (!user?.id) return;
@@ -442,6 +472,30 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </div>
+            )}
+
+            {(godaddyStats.unmatched > 0 || godaddyStats.pendingReceipts > 0) && (
+              <Link
+                to="/leadership?tab=godaddy"
+                className="block bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-xl p-4 hover:border-teal-300 transition-colors"
+              >
+                <div className="flex items-start gap-3">
+                  <Globe className="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="text-sm font-semibold text-teal-800 mb-1">
+                      GoDaddy Orders
+                    </h3>
+                    <div className="text-xs text-teal-700 space-y-1">
+                      {godaddyStats.unmatched > 0 && (
+                        <p>{godaddyStats.unmatched} unmatched order{godaddyStats.unmatched !== 1 ? 's' : ''}</p>
+                      )}
+                      {godaddyStats.pendingReceipts > 0 && (
+                        <p>{godaddyStats.pendingReceipts} receipt{godaddyStats.pendingReceipts !== 1 ? 's' : ''} pending import</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </Link>
             )}
 
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">

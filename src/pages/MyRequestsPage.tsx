@@ -13,10 +13,29 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import type { PurchaseRequest } from '../types/database';
+import OrderJourney, { calculateJourneySteps } from '../components/OrderJourney';
+
+interface RequestWithDetails extends PurchaseRequest {
+  signatures: Array<{
+    approver_name: string;
+    approver_title: string;
+    signature_url: string | null;
+    action: string;
+    signed_at: string;
+    comments: string | null;
+  }>;
+  receipts: Array<{
+    id: string;
+    file_name: string;
+    status: string;
+    uploaded_at: string;
+    notes: string | null;
+  }>;
+}
 
 export default function MyRequestsPage() {
   const { user } = useAuth();
-  const [requests, setRequests] = useState<PurchaseRequest[]>([]);
+  const [requests, setRequests] = useState<RequestWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -32,14 +51,31 @@ export default function MyRequestsPage() {
 
     const { data, error } = await supabase
       .from('purchase_requests')
-      .select('*')
+      .select(`
+        *,
+        signatures:approval_signatures(
+          approver_name,
+          approver_title,
+          signature_url,
+          action,
+          signed_at,
+          comments
+        ),
+        receipts:purchase_receipts(
+          id,
+          file_name,
+          status,
+          uploaded_at,
+          notes
+        )
+      `)
       .eq('requester_id', user.id)
       .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Error fetching requests:', error);
     } else {
-      setRequests(data || []);
+      setRequests((data || []) as RequestWithDetails[]);
     }
     setLoading(false);
   }
@@ -76,7 +112,9 @@ export default function MyRequestsPage() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -156,9 +194,20 @@ export default function MyRequestsPage() {
                       </span>
                     </div>
                     <p className="text-xs text-slate-500 truncate">{request.business_purpose}</p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {formatDate(request.created_at)} &middot; {request.category}
-                    </p>
+                    <div className="flex items-center gap-3 mt-2">
+                      <OrderJourney
+                        steps={calculateJourneySteps(
+                          request,
+                          request.signatures || [],
+                          request.receipts || [],
+                          (request as any).external_order_id
+                        )}
+                        compact
+                      />
+                      <span className="text-[10px] text-slate-400">
+                        {formatDate(request.created_at)}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 flex-shrink-0 ml-4">

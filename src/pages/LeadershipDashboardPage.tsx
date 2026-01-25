@@ -9,6 +9,7 @@ import {
   FileSpreadsheet,
   Download,
   Receipt,
+  Globe,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -17,14 +18,16 @@ import AllRequestsTab from '../components/leadership/AllRequestsTab';
 import BudgetsTab from '../components/leadership/BudgetsTab';
 import AnalyticsTab from '../components/leadership/AnalyticsTab';
 import ReceiptsTab from '../components/leadership/ReceiptsTab';
+import GoDaddyOrdersTab from '../components/leadership/GoDaddyOrdersTab';
 import { exportMasterSpreadsheet } from '../utils/masterExport';
 
-type TabId = 'overview' | 'requests' | 'receipts' | 'budgets' | 'analytics';
+type TabId = 'overview' | 'requests' | 'receipts' | 'godaddy' | 'budgets' | 'analytics';
 
 const tabs = [
   { id: 'overview' as TabId, label: 'Overview', icon: LayoutGrid },
   { id: 'requests' as TabId, label: 'All Requests', icon: FileText },
   { id: 'receipts' as TabId, label: 'Receipts', icon: Receipt },
+  { id: 'godaddy' as TabId, label: 'GoDaddy Orders', icon: Globe },
   { id: 'budgets' as TabId, label: 'Budgets', icon: Wallet },
   { id: 'analytics' as TabId, label: 'Analytics', icon: BarChart3 },
 ];
@@ -159,6 +162,7 @@ export default function LeadershipDashboardPage() {
           {activeTab === 'overview' && <OverviewTab onNavigateToReceipts={() => setActiveTab('receipts')} />}
           {activeTab === 'requests' && <AllRequestsTab />}
           {activeTab === 'receipts' && <ReceiptsTab />}
+          {activeTab === 'godaddy' && <GoDaddyOrdersTab />}
           {activeTab === 'budgets' && <BudgetsTab />}
           {activeTab === 'analytics' && <AnalyticsTab />}
         </div>

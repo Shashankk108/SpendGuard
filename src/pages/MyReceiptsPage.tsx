@@ -17,6 +17,7 @@ import {
   Filter,
   Image,
   Info,
+  Globe,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -48,9 +49,6 @@ interface ReceiptWithRequest {
     business_purpose: string;
     status: string;
   };
-  requester_by_profile?: {
-    full_name: string;
-  };
 }
 
 interface PendingUpload {
@@ -62,15 +60,28 @@ interface PendingUpload {
   status: string;
 }
 
+interface GoDaddyReceiptRequest {
+  id: string;
+  order_id: string;
+  domain_or_product: string;
+  order_total: number;
+  currency: string;
+  order_date: string;
+  receipt_requested_at: string;
+  matched_request_id: string;
+}
+
 export default function MyReceiptsPage() {
   const { user } = useAuth();
   const [receipts, setReceipts] = useState<ReceiptWithRequest[]>([]);
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
+  const [godaddyRequests, setGodaddyRequests] = useState<GoDaddyReceiptRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedReceipt, setSelectedReceipt] = useState<ReceiptWithRequest | null>(null);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<PendingUpload | null>(null);
   const [reuploadReceipt, setReuploadReceipt] = useState<ReceiptWithRequest | null>(null);
+  const [selectedGodaddyOrder, setSelectedGodaddyOrder] = useState<GoDaddyReceiptRequest | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'reupload' | 'verified' | 'issues'>('all');
 
   useEffect(() => {
@@ -95,14 +106,16 @@ export default function MyReceiptsPage() {
             expense_date,
             business_purpose,
             status
-          ),
-          requester_by_profile:reupload_requested_by(full_name)
+          )
         `)
         .eq('user_id', user.id)
         .eq('is_current', true)
         .order('created_at', { ascending: false });
 
-      if (receiptsError) throw receiptsError;
+      if (receiptsError) {
+        console.error('Error fetching receipts:', receiptsError);
+        throw receiptsError;
+      }
       setReceipts(myReceipts || []);
 
       const { data: approvedRequests, error: requestsError } = await supabase
@@ -116,6 +129,19 @@ export default function MyReceiptsPage() {
       const receiptRequestIds = new Set((myReceipts || []).map(r => r.request_id));
       const pending = (approvedRequests || []).filter(r => !receiptRequestIds.has(r.id));
       setPendingUploads(pending);
+
+      const approvedRequestIds = (approvedRequests || []).map(r => r.id);
+      if (approvedRequestIds.length > 0) {
+        const { data: godaddyData } = await supabase
+          .from('godaddy_orders')
+          .select('id, order_id, domain_or_product, order_total, currency, order_date, receipt_requested_at, matched_request_id')
+          .in('matched_request_id', approvedRequestIds)
+          .eq('receipt_requested', true)
+          .eq('receipt_uploaded', false)
+          .order('receipt_requested_at', { ascending: false });
+
+        setGodaddyRequests(godaddyData || []);
+      }
     } catch (err) {
       console.error('Error fetching receipts:', err);
     } finally {
@@ -181,7 +207,9 @@ export default function MyReceiptsPage() {
   };
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -252,17 +280,67 @@ export default function MyReceiptsPage() {
         </div>
       )}
 
-      {pendingUploads.length > 0 && (
-        <div className="mb-6 bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-xl p-5">
+      {godaddyRequests.length > 0 && (
+        <div className="mb-6 bg-gradient-to-r from-teal-50 to-cyan-50 border-2 border-teal-300 rounded-xl p-5">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 bg-teal-100 rounded-xl flex items-center justify-center flex-shrink-0">
-              <Receipt className="w-6 h-6 text-teal-600" />
+              <Globe className="w-6 h-6 text-teal-600" />
             </div>
             <div className="flex-1">
               <h3 className="text-base font-semibold text-teal-800 mb-1">
-                {pendingUploads.length} Receipt{pendingUploads.length !== 1 ? 's' : ''} Needed
+                {godaddyRequests.length} GoDaddy Receipt{godaddyRequests.length !== 1 ? 's' : ''} Requested
               </h3>
               <p className="text-sm text-teal-700 mb-4">
+                Leadership has requested receipts for your GoDaddy orders. Please download from your GoDaddy account and upload here.
+              </p>
+              <div className="space-y-3">
+                {godaddyRequests.map(order => (
+                  <div
+                    key={order.id}
+                    className="bg-white rounded-lg p-4 border border-teal-200 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <Globe className="w-4 h-4 text-teal-500 flex-shrink-0" />
+                          <p className="font-medium text-slate-800">
+                            Order #{order.order_id}
+                          </p>
+                        </div>
+                        <p className="text-sm text-slate-600 mt-1 truncate">
+                          {order.domain_or_product}
+                        </p>
+                        <p className="text-sm font-semibold text-teal-700 mt-1">
+                          ${order.order_total.toFixed(2)} {order.currency}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setSelectedGodaddyOrder(order)}
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors flex-shrink-0"
+                      >
+                        <Upload className="w-4 h-4" />
+                        Upload Receipt
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingUploads.length > 0 && (
+        <div className="mb-6 bg-gradient-to-r from-sky-50 to-blue-50 border border-sky-200 rounded-xl p-5">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 bg-sky-100 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Receipt className="w-6 h-6 text-sky-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-base font-semibold text-sky-800 mb-1">
+                {pendingUploads.length} Receipt{pendingUploads.length !== 1 ? 's' : ''} Needed
+              </h3>
+              <p className="text-sm text-sky-700 mb-4">
                 Upload receipts for your approved purchases.
               </p>
               <div className="space-y-2">
@@ -513,6 +591,17 @@ export default function MyReceiptsPage() {
           onSuccess={() => {
             fetchReceipts();
             setReuploadReceipt(null);
+          }}
+        />
+      )}
+
+      {selectedGodaddyOrder && (
+        <GoDaddyReceiptUploadModal
+          order={selectedGodaddyOrder}
+          onClose={() => setSelectedGodaddyOrder(null)}
+          onSuccess={() => {
+            fetchReceipts();
+            setSelectedGodaddyOrder(null);
           }}
         />
       )}
@@ -960,6 +1049,231 @@ function ReceiptReuploadModal({ receipt, onClose, onSuccess }: ReceiptReuploadMo
                     <>
                       <RefreshCw className="w-4 h-4" />
                       Submit New Receipt
+                    </>
+                  )}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface GoDaddyReceiptUploadModalProps {
+  order: GoDaddyReceiptRequest;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+function GoDaddyReceiptUploadModal({ order, onClose, onSuccess }: GoDaddyReceiptUploadModalProps) {
+  const { user } = useAuth();
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [notes, setNotes] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+
+  const handleFileSelect = (selectedFile: File) => {
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    const maxSize = 10 * 1024 * 1024;
+
+    if (!validTypes.includes(selectedFile.type)) {
+      setError('Please upload a JPEG, PNG, WebP image or PDF file.');
+      return;
+    }
+
+    if (selectedFile.size > maxSize) {
+      setError('File size must be less than 10MB');
+      return;
+    }
+
+    setError(null);
+    setFile(selectedFile);
+
+    if (selectedFile.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setPreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(selectedFile);
+    } else {
+      setPreview(null);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!file || !user) return;
+
+    setUploading(true);
+    setError(null);
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64Data = e.target?.result as string;
+
+        const { error: updateError } = await supabase
+          .from('godaddy_orders')
+          .update({
+            receipt_uploaded: true,
+            receipt_file_url: base64Data,
+            receipt_file_name: file.name,
+            receipt_uploaded_at: new Date().toISOString(),
+            receipt_uploaded_by: user.id,
+          })
+          .eq('id', order.id);
+
+        if (updateError) throw updateError;
+
+        setSuccess(true);
+        setTimeout(() => {
+          onSuccess();
+        }, 1500);
+      };
+
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.error('Error uploading GoDaddy receipt:', err);
+      setError(err.message || 'Failed to upload receipt');
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-teal-50 to-cyan-50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-teal-100 rounded-lg flex items-center justify-center">
+              <Globe className="w-5 h-5 text-teal-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Upload GoDaddy Receipt</h2>
+              <p className="text-sm text-slate-500">Order #{order.order_id}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6">
+          {success ? (
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-slate-900 mb-2">Receipt Uploaded!</h3>
+              <p className="text-sm text-slate-500">Your receipt has been submitted successfully.</p>
+            </div>
+          ) : (
+            <>
+              <div className="mb-4 p-4 bg-slate-50 rounded-xl">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Order Details</p>
+                <p className="text-sm font-medium text-slate-800 mb-1">{order.domain_or_product}</p>
+                <p className="text-lg font-bold text-teal-700">${order.order_total.toFixed(2)} {order.currency}</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  Order date: {new Date(order.order_date).toLocaleDateString()}
+                </p>
+              </div>
+
+              <div className="mb-4 p-3 bg-sky-50 border border-sky-200 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <Info className="w-4 h-4 text-sky-600 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm text-sky-800">
+                    <p className="font-medium mb-1">How to get your GoDaddy receipt:</p>
+                    <ol className="text-xs space-y-1 text-sky-700 list-decimal list-inside">
+                      <li>Log in to your GoDaddy account</li>
+                      <li>Go to Order History</li>
+                      <li>Find order #{order.order_id}</li>
+                      <li>Download or screenshot the receipt</li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                onDrop={(e) => { e.preventDefault(); setDragOver(false); e.dataTransfer.files[0] && handleFileSelect(e.dataTransfer.files[0]); }}
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onClick={() => document.getElementById('godaddy-file-input')?.click()}
+                className={`relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
+                  dragOver ? 'border-teal-500 bg-teal-50' : file ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <input
+                  id="godaddy-file-input"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,application/pdf"
+                  onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                  className="hidden"
+                />
+
+                {preview ? (
+                  <div className="space-y-3">
+                    <img src={preview} alt="Receipt preview" className="max-h-40 mx-auto rounded-lg shadow-md" />
+                    <p className="text-sm font-medium text-emerald-700">{file?.name}</p>
+                    <p className="text-xs text-slate-500">Click to change file</p>
+                  </div>
+                ) : file ? (
+                  <div className="space-y-3">
+                    <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center mx-auto">
+                      <FileText className="w-6 h-6 text-emerald-600" />
+                    </div>
+                    <p className="text-sm font-medium text-emerald-700">{file.name}</p>
+                    <p className="text-xs text-slate-500">Click to change file</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="w-14 h-14 bg-slate-100 rounded-xl flex items-center justify-center mx-auto">
+                      <Camera className="w-7 h-7 text-slate-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-700">Drop your receipt here or click to browse</p>
+                      <p className="text-xs text-slate-500 mt-1">JPEG, PNG, or PDF up to 10MB</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {error && (
+                <div className="mt-4 flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-lg">
+                  <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                  <p className="text-sm text-red-600">{error}</p>
+                </div>
+              )}
+
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Notes (optional)</label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Add any notes about this receipt..."
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 resize-none"
+                  rows={2}
+                />
+              </div>
+
+              <div className="mt-6 flex items-center gap-3">
+                <button onClick={onClose} className="flex-1 px-4 py-2.5 text-sm font-medium text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200">
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={!file || uploading}
+                  className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {uploading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      Submit Receipt
                     </>
                   )}
                 </button>

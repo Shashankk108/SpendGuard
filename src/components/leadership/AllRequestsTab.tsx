@@ -16,13 +16,23 @@ import {
 import { supabase } from '../../lib/supabase';
 import type { PurchaseRequest, ApprovalSignature, Profile } from '../../types/database';
 import { getApprovalTier } from '../../utils/validation';
+import OrderJourney, { calculateJourneySteps } from '../OrderJourney';
 
 type SortField = 'created_at' | 'total_amount' | 'vendor_name' | 'status';
 type SortDirection = 'asc' | 'desc';
 
+interface ReceiptData {
+  id: string;
+  file_name: string;
+  status: string;
+  uploaded_at: string;
+  notes: string | null;
+}
+
 interface RequestWithDetails extends PurchaseRequest {
   signatures?: ApprovalSignature[];
   requester?: Profile;
+  receipts?: ReceiptData[];
 }
 
 export default function AllRequestsTab() {
@@ -55,13 +65,17 @@ export default function AllRequestsTab() {
       return;
     }
 
+    const requestIds = requestsData.map((r) => r.id);
+
     const { data: signaturesData } = await supabase
       .from('approval_signatures')
       .select('*')
-      .in(
-        'request_id',
-        requestsData.map((r) => r.id)
-      );
+      .in('request_id', requestIds);
+
+    const { data: receiptsData } = await supabase
+      .from('purchase_receipts')
+      .select('id, request_id, file_name, status, uploaded_at, notes')
+      .in('request_id', requestIds);
 
     const { data: profilesData } = await supabase
       .from('profiles')
@@ -79,10 +93,18 @@ export default function AllRequestsTab() {
       signaturesMap.set(sig.request_id, existing);
     });
 
+    const receiptsMap = new Map<string, ReceiptData[]>();
+    receiptsData?.forEach((receipt) => {
+      const existing = receiptsMap.get(receipt.request_id) || [];
+      existing.push(receipt);
+      receiptsMap.set(receipt.request_id, existing);
+    });
+
     const enrichedRequests: RequestWithDetails[] = requestsData.map((r) => ({
       ...r,
       signatures: signaturesMap.get(r.id) || [],
       requester: profilesMap.get(r.requester_id),
+      receipts: receiptsMap.get(r.id) || [],
     }));
 
     setRequests(enrichedRequests);
@@ -496,6 +518,25 @@ export default function AllRequestsTab() {
               </button>
             </div>
             <div className="p-6 space-y-4">
+              <div className="bg-slate-50 rounded-xl p-4 mb-4">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Order Journey</p>
+                <OrderJourney
+                  steps={calculateJourneySteps(
+                    selectedRequest,
+                    (selectedRequest.signatures || []).map(s => ({
+                      approver_name: s.approver_name,
+                      approver_title: s.approver_title,
+                      signature_url: s.signature_url,
+                      action: s.action,
+                      signed_at: s.signed_at,
+                      comments: s.comments,
+                    })),
+                    selectedRequest.receipts || [],
+                    (selectedRequest as any).external_order_id
+                  )}
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs text-slate-500">Requester</p>

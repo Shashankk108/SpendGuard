@@ -106,7 +106,10 @@ export default function ApprovalReceiptPage() {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    // Parse as local date to avoid timezone conversion issues
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString('en-US', {
       month: 'long',
       day: 'numeric',
       year: 'numeric',

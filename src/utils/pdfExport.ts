@@ -1,15 +1,24 @@
 import jsPDF from 'jspdf';
 import type { PurchaseRequest, ApprovalSignature } from '../types/database';
 
+interface ReceiptData {
+  id: string;
+  file_name: string;
+  status: string;
+  uploaded_at: string;
+  notes?: string | null;
+}
+
 interface ExportData {
   request: PurchaseRequest;
   signatures: ApprovalSignature[];
   requesterName?: string;
   requesterDepartment?: string;
+  receipts?: ReceiptData[];
 }
 
 export async function exportRequestToPDF(data: ExportData): Promise<void> {
-  const { request, signatures, requesterName, requesterDepartment } = data;
+  const { request, signatures, requesterName, requesterDepartment, receipts = [] } = data;
   const doc = new jsPDF();
 
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -79,6 +88,111 @@ export async function exportRequestToPDF(data: ExportData): Promise<void> {
   doc.text(`$${request.total_amount.toLocaleString()}`, pageWidth - margin - 55, y + 12);
 
   y += 25;
+
+  const isRejected = request.status === 'rejected';
+  const isApproved = request.status === 'approved';
+  const hasReceipt = receipts.length > 0;
+  const receiptApproved = receipts.some(r => r.status === 'approved');
+
+  interface JourneyStep {
+    label: string;
+    status: 'completed' | 'current' | 'pending' | 'failed';
+  }
+
+  const journeySteps: JourneyStep[] = [];
+
+  journeySteps.push({ label: 'Submitted', status: 'completed' });
+
+  if (isRejected) {
+    journeySteps.push({ label: 'Rejected', status: 'failed' });
+    journeySteps.push({ label: 'Receipt', status: 'pending' });
+    journeySteps.push({ label: 'Complete', status: 'pending' });
+  } else if (isApproved) {
+    journeySteps.push({ label: 'Approved', status: 'completed' });
+    if (hasReceipt) {
+      journeySteps.push({ label: 'Receipt', status: 'completed' });
+      if (receiptApproved) {
+        journeySteps.push({ label: 'Complete', status: 'completed' });
+      } else {
+        journeySteps.push({ label: 'Complete', status: 'current' });
+      }
+    } else {
+      journeySteps.push({ label: 'Receipt', status: 'current' });
+      journeySteps.push({ label: 'Complete', status: 'pending' });
+    }
+  } else {
+    journeySteps.push({ label: 'Approval', status: 'current' });
+    journeySteps.push({ label: 'Receipt', status: 'pending' });
+    journeySteps.push({ label: 'Complete', status: 'pending' });
+  }
+
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(margin, y, contentWidth, 30, 3, 3, 'F');
+
+  doc.setTextColor(...lightGray);
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  doc.text('ORDER JOURNEY', margin + 6, y + 6);
+
+  const stepWidth = (contentWidth - 12) / journeySteps.length;
+  const circleY = y + 18;
+  const circleRadius = 4;
+
+  journeySteps.forEach((step, index) => {
+    const stepX = margin + 6 + (stepWidth * index) + (stepWidth / 2);
+
+    if (index > 0) {
+      const prevX = margin + 6 + (stepWidth * (index - 1)) + (stepWidth / 2);
+      const prevStep = journeySteps[index - 1];
+      if (prevStep.status === 'completed') {
+        doc.setDrawColor(16, 185, 129);
+      } else if (prevStep.status === 'failed') {
+        doc.setDrawColor(239, 68, 68);
+      } else {
+        doc.setDrawColor(203, 213, 225);
+      }
+      doc.setLineWidth(1);
+      doc.line(prevX + circleRadius + 1, circleY, stepX - circleRadius - 1, circleY);
+    }
+
+    if (step.status === 'completed') {
+      doc.setFillColor(16, 185, 129);
+      doc.setDrawColor(16, 185, 129);
+    } else if (step.status === 'current') {
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(20, 184, 166);
+    } else if (step.status === 'failed') {
+      doc.setFillColor(239, 68, 68);
+      doc.setDrawColor(239, 68, 68);
+    } else {
+      doc.setFillColor(255, 255, 255);
+      doc.setDrawColor(203, 213, 225);
+    }
+
+    doc.circle(stepX, circleY, circleRadius, step.status === 'current' ? 'S' : 'FD');
+
+    if (step.status === 'completed') {
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(6);
+      doc.setFont('helvetica', 'bold');
+      doc.text('✓', stepX - 1.5, circleY + 1.5);
+    } else if (step.status === 'failed') {
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(6);
+      doc.setFont('helvetica', 'bold');
+      doc.text('✕', stepX - 1.5, circleY + 1.5);
+    }
+
+    const labelColor: [number, number, number] = step.status === 'completed' ? [6, 95, 70] :
+      step.status === 'current' ? [13, 148, 136] :
+      step.status === 'failed' ? [185, 28, 28] : [148, 163, 184];
+    doc.setTextColor(...labelColor);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', step.status === 'pending' ? 'normal' : 'bold');
+    doc.text(step.label, stepX, circleY + 9, { align: 'center' });
+  });
+
+  y += 36;
 
   function drawSectionHeader(title: string) {
     doc.setFillColor(241, 245, 249);

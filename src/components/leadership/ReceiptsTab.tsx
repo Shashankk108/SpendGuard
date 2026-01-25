@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Receipt,
   CheckCircle,
@@ -42,6 +42,7 @@ interface ReceiptAnalysis {
   expected_date: string | null;
   confidence_score: number;
   recommendation: 'approve' | 'review' | 'reject';
+  concerns?: string[];
   analysis_notes: string;
 }
 
@@ -112,21 +113,61 @@ export default function ReceiptsTab() {
   const [requestingReupload, setRequestingReupload] = useState(false);
   const [analysisStep, setAnalysisStep] = useState<string>('');
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [viewingVersion, setViewingVersion] = useState<'current' | 'previous'>('current');
 
   useEffect(() => {
     fetchReceipts();
   }, [view, filter]);
 
+  const prevSelectedReceiptId = useRef<string | null>(null);
+
   useEffect(() => {
     if (selectedReceipt) {
-      analyzeReceipt(selectedReceipt);
+      const isNewReceipt = prevSelectedReceiptId.current !== selectedReceipt.id;
+      prevSelectedReceiptId.current = selectedReceipt.id;
+
+      if (isNewReceipt) {
+        setViewingVersion('current');
+        setAnalysis(null);
+        analyzeViewedReceipt(selectedReceipt, 'current');
+      }
     } else {
+      prevSelectedReceiptId.current = null;
       setAnalysis(null);
+      setViewingVersion('current');
     }
   }, [selectedReceipt]);
 
-  async function analyzeReceipt(receipt: ReceiptData, forceReanalyze = false) {
+  useEffect(() => {
+    if (selectedReceipt && prevSelectedReceiptId.current === selectedReceipt.id) {
+      setAnalysis(null);
+      analyzeViewedReceipt(selectedReceipt, viewingVersion);
+    }
+  }, [viewingVersion]);
+
+  function getViewedReceiptInfo(receipt: ReceiptData, version: 'current' | 'previous') {
+    if (version === 'previous' && receipt.previous_receipt) {
+      return {
+        id: receipt.previous_receipt.id,
+        file_url: receipt.previous_receipt.file_url,
+        file_type: receipt.previous_receipt.file_type,
+        request_id: receipt.request_id,
+        purchase_request: receipt.purchase_request,
+      };
+    }
+    return {
+      id: receipt.id,
+      file_url: receipt.file_url,
+      file_type: receipt.file_type,
+      request_id: receipt.request_id,
+      purchase_request: receipt.purchase_request,
+    };
+  }
+
+  async function analyzeViewedReceipt(receipt: ReceiptData, version: 'current' | 'previous', forceReanalyze = false) {
     if (!receipt.purchase_request) return;
+
+    const receiptInfo = getViewedReceiptInfo(receipt, version);
 
     setAnalyzingReceipt(true);
     setAnalysisError(null);
@@ -137,7 +178,7 @@ export default function ReceiptsTab() {
         const { data: existingAnalysis } = await supabase
           .from('receipt_analyses')
           .select('*')
-          .eq('receipt_id', receipt.id)
+          .eq('receipt_id', receiptInfo.id)
           .maybeSingle();
 
         if (existingAnalysis) {
@@ -148,7 +189,7 @@ export default function ReceiptsTab() {
         }
       }
 
-      const isPdf = receipt.file_type === 'application/pdf';
+      const isPdf = receiptInfo.file_type === 'application/pdf';
       if (isPdf) {
         setAnalysisStep('PDF detected - preparing for analysis...');
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -164,11 +205,11 @@ export default function ReceiptsTab() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          receipt_id: receipt.id,
-          request_id: receipt.request_id,
-          file_url: receipt.file_url,
-          file_type: receipt.file_type,
-          purchase_request: receipt.purchase_request,
+          receipt_id: receiptInfo.id,
+          request_id: receiptInfo.request_id,
+          file_url: receiptInfo.file_url,
+          file_type: receiptInfo.file_type,
+          purchase_request: receiptInfo.purchase_request,
           force_reanalyze: forceReanalyze,
         }),
       });
@@ -210,14 +251,16 @@ export default function ReceiptsTab() {
   async function reanalyzeReceipt() {
     if (!selectedReceipt) return;
 
+    const receiptInfo = getViewedReceiptInfo(selectedReceipt, viewingVersion);
+
     await supabase
       .from('receipt_analyses')
       .delete()
-      .eq('receipt_id', selectedReceipt.id);
+      .eq('receipt_id', receiptInfo.id);
 
     setAnalysis(null);
     setAnalysisError(null);
-    analyzeReceipt(selectedReceipt, true);
+    analyzeViewedReceipt(selectedReceipt, viewingVersion, true);
   }
 
   async function fetchReceipts() {
@@ -382,7 +425,11 @@ export default function ReceiptsTab() {
   }
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
+    // Parse as local date to avoid timezone conversion issues
+    // "2026-01-25" should display as Jan 25, not Jan 24
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -394,6 +441,42 @@ export default function ReceiptsTab() {
       style: 'currency',
       currency: 'USD',
     }).format(amount);
+  };
+
+  const generateDateExplanation = (extracted: string | null, expected: string | null, match: boolean) => {
+    if (!extracted || !expected) {
+      return extracted ? `Date "${formatDate(extracted)}" found on receipt.` : 'Could not extract date from receipt.';
+    }
+
+    const extractedDate = new Date(extracted);
+    const expectedDate = new Date(expected);
+    const diffTime = extractedDate.getTime() - expectedDate.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) {
+      return `Receipt date "${formatDate(extracted)}" matches the expected expense date exactly.`;
+    }
+
+    const direction = diffDays > 0 ? 'after' : 'before';
+    const absDiff = Math.abs(diffDays);
+
+    if (match) {
+      return `Receipt dated "${formatDate(extracted)}" is ${absDiff} day${absDiff > 1 ? 's' : ''} ${direction} expected date "${formatDate(expected)}". Within acceptable tolerance.`;
+    }
+
+    return `Receipt dated "${formatDate(extracted)}" is ${absDiff} day${absDiff > 1 ? 's' : ''} ${direction} expected date "${formatDate(expected)}". Date mismatch.`;
+  };
+
+  const generateVendorExplanation = (extracted: string | null, expected: string | null, match: boolean) => {
+    if (!extracted) return 'Could not extract vendor name from receipt.';
+    if (match) return `Vendor "${extracted}" on receipt matches expected vendor "${expected}".`;
+    return `Vendor "${extracted}" does not match expected vendor "${expected}".`;
+  };
+
+  const generateAmountExplanation = (extracted: number | null, expected: number | null, match: boolean) => {
+    if (extracted === null) return 'Could not extract amount from receipt.';
+    if (match) return `Amount ${formatCurrency(extracted)} matches expected amount ${formatCurrency(expected || 0)}.`;
+    return `Amount ${formatCurrency(extracted)} does not match expected ${formatCurrency(expected || 0)}.`;
   };
 
   const getStatusBadge = (status: string) => {
@@ -663,60 +746,78 @@ export default function ReceiptsTab() {
                       <RefreshCw className="w-4 h-4 text-sky-600" />
                       <span className="text-sm font-medium text-sky-800">Re-uploaded Receipt (Version {selectedReceipt.version})</span>
                     </div>
-                    <p className="text-xs text-sky-700 mb-3">This is a new upload replacing the previous version. Compare below:</p>
+                    <p className="text-xs text-sky-700 mb-3">Click a thumbnail to view and analyze it below:</p>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                          <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+                        <p className={`text-[10px] uppercase tracking-wider mb-1.5 flex items-center gap-1 ${viewingVersion === 'previous' ? 'text-sky-600 font-semibold' : 'text-slate-500'}`}>
+                          <span className={`w-2 h-2 rounded-full ${viewingVersion === 'previous' ? 'bg-sky-500 animate-pulse' : 'bg-slate-400'}`}></span>
                           Previous (v{selectedReceipt.previous_receipt.version})
                         </p>
-                        <div className="border border-slate-300 rounded-lg overflow-hidden bg-slate-100 opacity-60 h-32">
+                        <button
+                          type="button"
+                          onClick={() => setViewingVersion('previous')}
+                          className={`w-full rounded-lg overflow-hidden h-32 transition-all cursor-pointer ${
+                            viewingVersion === 'previous'
+                              ? 'border-2 border-sky-400 ring-2 ring-sky-200 bg-white'
+                              : 'border border-slate-300 bg-slate-100 hover:border-slate-400 hover:bg-slate-50'
+                          }`}
+                        >
                           {selectedReceipt.previous_receipt.file_type?.startsWith('image/') ? (
                             <img
                               src={selectedReceipt.previous_receipt.file_url}
                               alt="Previous receipt"
-                              className="w-full h-full object-contain"
+                              className={`w-full h-full object-contain ${viewingVersion !== 'previous' ? 'opacity-60' : ''}`}
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
-                              <FileText className="w-8 h-8 text-slate-400" />
+                              <FileText className={`w-8 h-8 ${viewingVersion === 'previous' ? 'text-sky-500' : 'text-slate-400'}`} />
                             </div>
                           )}
-                        </div>
+                        </button>
                       </div>
                       <div>
-                        <p className="text-[10px] text-sky-600 uppercase tracking-wider mb-1.5 font-semibold flex items-center gap-1">
-                          <span className="w-2 h-2 rounded-full bg-sky-500 animate-pulse"></span>
+                        <p className={`text-[10px] uppercase tracking-wider mb-1.5 font-semibold flex items-center gap-1 ${viewingVersion === 'current' ? 'text-sky-600' : 'text-slate-500'}`}>
+                          <span className={`w-2 h-2 rounded-full ${viewingVersion === 'current' ? 'bg-sky-500 animate-pulse' : 'bg-slate-400'}`}></span>
                           New Upload (v{selectedReceipt.version})
                         </p>
-                        <div className="border-2 border-sky-400 rounded-lg overflow-hidden bg-white h-32 ring-2 ring-sky-200">
+                        <button
+                          type="button"
+                          onClick={() => setViewingVersion('current')}
+                          className={`w-full rounded-lg overflow-hidden h-32 transition-all cursor-pointer ${
+                            viewingVersion === 'current'
+                              ? 'border-2 border-sky-400 ring-2 ring-sky-200 bg-white'
+                              : 'border border-slate-300 bg-slate-100 hover:border-slate-400 hover:bg-slate-50'
+                          }`}
+                        >
                           {selectedReceipt.file_type?.startsWith('image/') ? (
                             <img
                               src={selectedReceipt.file_url}
                               alt="New receipt"
-                              className="w-full h-full object-contain"
+                              className={`w-full h-full object-contain ${viewingVersion !== 'current' ? 'opacity-60' : ''}`}
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
-                              <FileText className="w-8 h-8 text-sky-500" />
+                              <FileText className={`w-8 h-8 ${viewingVersion === 'current' ? 'text-sky-500' : 'text-slate-400'}`} />
                             </div>
                           )}
-                        </div>
+                        </button>
                       </div>
                     </div>
                   </div>
                 )}
                 <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
                   Receipt Image
-                  {selectedReceipt.version > 1 && (
-                    <span className="text-sky-600 font-semibold">(Current Version {selectedReceipt.version})</span>
+                  {selectedReceipt.version > 1 && selectedReceipt.previous_receipt && (
+                    <span className={viewingVersion === 'current' ? 'text-sky-600 font-semibold' : 'text-slate-600 font-semibold'}>
+                      ({viewingVersion === 'current' ? `Current Version ${selectedReceipt.version}` : `Previous Version ${selectedReceipt.previous_receipt.version}`})
+                    </span>
                   )}
                 </p>
-                <div className={`border rounded-lg overflow-hidden bg-slate-50 relative ${selectedReceipt.version > 1 ? 'border-sky-300 ring-1 ring-sky-200' : 'border-slate-200'}`}>
+                <div className={`border rounded-lg overflow-hidden bg-slate-50 relative ${selectedReceipt.version > 1 && viewingVersion === 'current' ? 'border-sky-300 ring-1 ring-sky-200' : 'border-slate-200'}`}>
                   <FileViewer
-                    fileUrl={selectedReceipt.file_url}
-                    fileType={selectedReceipt.file_type}
-                    fileName={selectedReceipt.file_name}
+                    fileUrl={viewingVersion === 'current' || !selectedReceipt.previous_receipt ? selectedReceipt.file_url : selectedReceipt.previous_receipt.file_url}
+                    fileType={viewingVersion === 'current' || !selectedReceipt.previous_receipt ? selectedReceipt.file_type : selectedReceipt.previous_receipt.file_type}
+                    fileName={viewingVersion === 'current' || !selectedReceipt.previous_receipt ? selectedReceipt.file_name : `previous_${selectedReceipt.file_name}`}
                   />
                 </div>
               </div>
@@ -798,7 +899,7 @@ export default function ReceiptsTab() {
                     )}
                   <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
                     <div className={`px-5 py-4 ${
-                      analysis.recommendation === 'approve'
+                      analysis.confidence_score >= 90
                         ? 'bg-gradient-to-r from-emerald-50 to-green-50 border-b border-emerald-100'
                         : analysis.recommendation === 'reject'
                         ? 'bg-gradient-to-r from-red-50 to-rose-50 border-b border-red-100'
@@ -807,13 +908,13 @@ export default function ReceiptsTab() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm ${
-                            analysis.recommendation === 'approve'
+                            analysis.confidence_score >= 90
                               ? 'bg-emerald-500'
                               : analysis.recommendation === 'reject'
                               ? 'bg-red-500'
                               : 'bg-amber-500'
                           }`}>
-                            {analysis.recommendation === 'approve' ? (
+                            {analysis.confidence_score >= 90 ? (
                               <ShieldCheck className="w-6 h-6 text-white" />
                             ) : analysis.recommendation === 'reject' ? (
                               <ShieldAlert className="w-6 h-6 text-white" />
@@ -823,39 +924,39 @@ export default function ReceiptsTab() {
                           </div>
                           <div>
                             <p className={`text-base font-bold ${
-                              analysis.recommendation === 'approve'
+                              analysis.confidence_score >= 90
                                 ? 'text-emerald-800'
                                 : analysis.recommendation === 'reject'
                                 ? 'text-red-800'
                                 : 'text-amber-800'
                             }`}>
-                              {analysis.recommendation === 'approve'
-                                ? 'Recommended for Approval'
+                              {analysis.confidence_score >= 90
+                                ? 'All Verified - Ready to Approve'
                                 : analysis.recommendation === 'reject'
-                                ? 'Issues Detected - Review Required'
-                                : 'Manual Review Recommended'}
+                                ? 'Verification Failed'
+                                : 'Review Recommended'}
                             </p>
                             <p className="text-xs text-slate-600 mt-0.5">
                               {analysis.vendor_match && analysis.amount_match && analysis.date_match
                                 ? 'All verification checks passed'
-                                : `${[analysis.vendor_match, analysis.amount_match, analysis.date_match].filter(Boolean).length}/3 checks passed`}
+                                : `${[analysis.vendor_match, analysis.amount_match, analysis.date_match].filter(Boolean).length} of 3 checks passed`}
                             </p>
                           </div>
                         </div>
                         <div className="text-right">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs font-medium text-slate-600">Confidence</span>
-                            <span className={`text-sm font-bold ${
-                              analysis.confidence_score >= 80 ? 'text-emerald-600' :
-                              analysis.confidence_score >= 50 ? 'text-amber-600' : 'text-red-600'
+                            <span className="text-xs font-medium text-slate-600">Match Score</span>
+                            <span className={`text-lg font-bold ${
+                              analysis.confidence_score >= 90 ? 'text-emerald-600' :
+                              analysis.confidence_score >= 60 ? 'text-amber-600' : 'text-red-600'
                             }`}>{analysis.confidence_score}%</span>
                           </div>
                           <div className="w-28 h-2.5 bg-slate-200 rounded-full overflow-hidden">
                             <div
                               className={`h-full rounded-full transition-all duration-500 ${
-                                analysis.confidence_score >= 80
+                                analysis.confidence_score >= 90
                                   ? 'bg-gradient-to-r from-emerald-400 to-emerald-500'
-                                  : analysis.confidence_score >= 50
+                                  : analysis.confidence_score >= 60
                                   ? 'bg-gradient-to-r from-amber-400 to-amber-500'
                                   : 'bg-gradient-to-r from-red-400 to-red-500'
                               }`}
@@ -865,6 +966,20 @@ export default function ReceiptsTab() {
                         </div>
                       </div>
                     </div>
+
+                    {analysis.concerns && analysis.concerns.length > 0 && (
+                      <div className="px-5 py-3 bg-gradient-to-r from-sky-50 to-cyan-50 border-b border-sky-100">
+                        <div className="flex items-start gap-2">
+                          <TrendingUp className="w-4 h-4 text-sky-600 mt-0.5 flex-shrink-0" />
+                          <div className="flex-1">
+                            <p className="text-xs font-semibold text-sky-800 mb-1">Note from AI Analysis</p>
+                            {analysis.concerns.map((concern, idx) => (
+                              <p key={idx} className="text-xs text-sky-700 leading-relaxed">{concern}</p>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="p-5 bg-white space-y-4">
                       <div className="grid grid-cols-3 gap-3">
@@ -941,12 +1056,12 @@ export default function ReceiptsTab() {
                               <p className="text-sm font-semibold text-slate-800">{analysis.extracted_vendor || 'Not detected'}</p>
                             </div>
                           </div>
-                          {analysis.vendor_reason && (
-                            <div className="flex items-start gap-2 bg-white/80 rounded-lg p-2">
-                              <Sparkles className="w-3.5 h-3.5 text-teal-600 mt-0.5 flex-shrink-0" />
-                              <p className="text-xs text-slate-700 leading-relaxed">{analysis.vendor_reason}</p>
-                            </div>
-                          )}
+                          <div className="flex items-start gap-2 bg-white/80 rounded-lg p-2">
+                            <Sparkles className="w-3.5 h-3.5 text-teal-600 mt-0.5 flex-shrink-0" />
+                            <p className="text-xs text-slate-700 leading-relaxed">
+                              {generateVendorExplanation(analysis.extracted_vendor, analysis.expected_vendor || selectedReceipt.purchase_request?.vendor_name || null, analysis.vendor_match)}
+                            </p>
+                          </div>
                         </div>
 
                         <div className={`p-4 rounded-xl border-l-4 ${
@@ -974,12 +1089,12 @@ export default function ReceiptsTab() {
                               <p className="text-sm font-semibold text-slate-800">{analysis.extracted_amount !== null ? formatCurrency(analysis.extracted_amount) : 'Not detected'}</p>
                             </div>
                           </div>
-                          {analysis.amount_reason && (
-                            <div className="flex items-start gap-2 bg-white/80 rounded-lg p-2">
-                              <Sparkles className="w-3.5 h-3.5 text-teal-600 mt-0.5 flex-shrink-0" />
-                              <p className="text-xs text-slate-700 leading-relaxed">{analysis.amount_reason}</p>
-                            </div>
-                          )}
+                          <div className="flex items-start gap-2 bg-white/80 rounded-lg p-2">
+                            <Sparkles className="w-3.5 h-3.5 text-teal-600 mt-0.5 flex-shrink-0" />
+                            <p className="text-xs text-slate-700 leading-relaxed">
+                              {generateAmountExplanation(analysis.extracted_amount, analysis.expected_amount || selectedReceipt.purchase_request?.total_amount || null, analysis.amount_match)}
+                            </p>
+                          </div>
                         </div>
 
                         <div className={`p-4 rounded-xl border-l-4 ${
@@ -1007,12 +1122,12 @@ export default function ReceiptsTab() {
                               <p className="text-sm font-semibold text-slate-800">{analysis.extracted_date ? formatDate(analysis.extracted_date) : 'Not detected'}</p>
                             </div>
                           </div>
-                          {analysis.date_reason && (
-                            <div className="flex items-start gap-2 bg-white/80 rounded-lg p-2">
-                              <Sparkles className="w-3.5 h-3.5 text-teal-600 mt-0.5 flex-shrink-0" />
-                              <p className="text-xs text-slate-700 leading-relaxed">{analysis.date_reason}</p>
-                            </div>
-                          )}
+                          <div className="flex items-start gap-2 bg-white/80 rounded-lg p-2">
+                            <Sparkles className="w-3.5 h-3.5 text-teal-600 mt-0.5 flex-shrink-0" />
+                            <p className="text-xs text-slate-700 leading-relaxed">
+                              {generateDateExplanation(analysis.extracted_date, analysis.expected_date || selectedReceipt.purchase_request?.expense_date || null, analysis.date_match)}
+                            </p>
+                          </div>
                         </div>
                       </div>
 

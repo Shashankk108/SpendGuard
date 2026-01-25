@@ -18,6 +18,9 @@ import {
   X,
   Upload,
   RefreshCw,
+  Globe,
+  Link2,
+  Loader2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -25,6 +28,7 @@ import type { PurchaseRequest, ApprovalSignature, Profile } from '../types/datab
 import { getApprovalTier, validatePurchaseRequest } from '../utils/validation';
 import SignaturePad from '../components/SignaturePad';
 import { exportRequestToPDF } from '../utils/pdfExport';
+import OrderJourney, { calculateJourneySteps } from '../components/OrderJourney';
 
 interface ReceiptData {
   id: string;
@@ -64,6 +68,10 @@ export default function RequestDetailPage() {
   const [reuploadFile, setReuploadFile] = useState<File | null>(null);
   const [reuploadComment, setReuploadComment] = useState('');
   const [uploadingReupload, setUploadingReupload] = useState(false);
+  const [showOrderIdForm, setShowOrderIdForm] = useState(false);
+  const [orderIdInput, setOrderIdInput] = useState('');
+  const [linkingOrderId, setLinkingOrderId] = useState(false);
+  const [orderIdError, setOrderIdError] = useState('');
 
   useEffect(() => {
     if (id) {
@@ -159,6 +167,13 @@ export default function RequestDetailPage() {
         signatures,
         requesterName: requesterProfile?.full_name,
         requesterDepartment: requesterProfile?.department,
+        receipts: receipts.map(r => ({
+          id: r.id,
+          file_name: r.file_name,
+          status: r.status,
+          uploaded_at: r.uploaded_at,
+          notes: r.notes,
+        })),
       });
     } catch (error) {
       console.error('Error exporting PDF:', error);
@@ -281,6 +296,55 @@ export default function RequestDetailPage() {
     }
   }
 
+  async function handleLinkOrderId() {
+    if (!orderIdInput.trim() || !request || !user?.id) return;
+
+    setLinkingOrderId(true);
+    setOrderIdError('');
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-godaddy-receipt`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            order_id: orderIdInput.trim(),
+            request_id: request.id,
+            user_id: user.id,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (result.success) {
+        await supabase
+          .from('purchase_requests')
+          .update({ external_order_id: orderIdInput.trim() })
+          .eq('id', request.id);
+
+        setShowOrderIdForm(false);
+        setOrderIdInput('');
+        fetchRequest();
+      } else {
+        setOrderIdError(result.error || 'Failed to link order. Please check the order ID.');
+      }
+    } catch (error) {
+      console.error('Error linking order:', error);
+      setOrderIdError('Failed to connect to GoDaddy. Please try again.');
+    } finally {
+      setLinkingOrderId(false);
+    }
+  }
+
+  const isGoDaddyVendor = request?.vendor_name?.toLowerCase().includes('godaddy') ||
+    request?.vendor_name?.toLowerCase().includes('go daddy') ||
+    (request as any)?.vendor_type === 'godaddy';
+
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto p-8 text-center text-slate-500">Loading...</div>
@@ -322,7 +386,9 @@ export default function RequestDetailPage() {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString('en-US', {
       month: 'long',
       day: 'numeric',
       year: 'numeric',
@@ -393,6 +459,24 @@ export default function RequestDetailPage() {
               )}
             </div>
           </div>
+        </div>
+
+        <div className="px-6 py-4 bg-slate-50 border-b border-slate-200">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-4">Order Journey</p>
+          <OrderJourney
+            steps={calculateJourneySteps(
+              request,
+              signatures,
+              receipts.map(r => ({
+                id: r.id,
+                file_name: r.file_name,
+                status: r.status,
+                uploaded_at: r.uploaded_at,
+                notes: r.notes,
+              })),
+              (request as any).external_order_id
+            )}
+          />
         </div>
 
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -605,6 +689,99 @@ export default function RequestDetailPage() {
                     </div>
                   ))}
                 </div>
+              </Section>
+            )}
+
+            {request.status === 'approved' && isGoDaddyVendor && user?.id === request.requester_id && (
+              <Section title="GoDaddy Order">
+                {(request as any).external_order_id ? (
+                  <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                      <span className="font-medium text-emerald-800">Order Linked</span>
+                    </div>
+                    <p className="text-sm text-emerald-700 font-mono">
+                      #{(request as any).external_order_id}
+                    </p>
+                    <p className="text-xs text-emerald-600 mt-1">
+                      Receipt will be automatically imported from GoDaddy
+                    </p>
+                  </div>
+                ) : showOrderIdForm ? (
+                  <div className="p-4 bg-teal-50 border border-teal-200 rounded-xl">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Globe className="w-5 h-5 text-teal-600" />
+                      <span className="font-medium text-teal-800">Link GoDaddy Order</span>
+                    </div>
+                    <p className="text-xs text-teal-700 mb-3">
+                      Enter your GoDaddy order number to automatically import the receipt.
+                    </p>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                          Order ID / Order Number
+                        </label>
+                        <input
+                          type="text"
+                          value={orderIdInput}
+                          onChange={(e) => setOrderIdInput(e.target.value)}
+                          placeholder="e.g., 3999851585"
+                          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                        />
+                      </div>
+                      {orderIdError && (
+                        <div className="p-2 bg-red-50 border border-red-200 rounded-lg">
+                          <p className="text-xs text-red-700">{orderIdError}</p>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            setShowOrderIdForm(false);
+                            setOrderIdInput('');
+                            setOrderIdError('');
+                          }}
+                          className="px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleLinkOrderId}
+                          disabled={!orderIdInput.trim() || linkingOrderId}
+                          className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-50"
+                        >
+                          {linkingOrderId ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              Linking...
+                            </>
+                          ) : (
+                            <>
+                              <Link2 className="w-3.5 h-3.5" />
+                              Link & Import Receipt
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                    <p className="text-sm text-slate-600 mb-3">
+                      Have you placed your GoDaddy order? Link it here to automatically import the receipt.
+                    </p>
+                    <button
+                      onClick={() => setShowOrderIdForm(true)}
+                      className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-teal-700 bg-teal-50 border border-teal-200 rounded-lg hover:bg-teal-100 transition-colors"
+                    >
+                      <Globe className="w-4 h-4" />
+                      Enter GoDaddy Order ID
+                    </button>
+                    <p className="text-xs text-slate-500 mt-3">
+                      Or you can upload a receipt manually below.
+                    </p>
+                  </div>
+                )}
               </Section>
             )}
 

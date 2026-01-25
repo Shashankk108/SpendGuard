@@ -35,6 +35,25 @@ interface ApprovalActionPayload {
   action: "approved" | "rejected";
   approverName: string;
   comments?: string;
+  isGodaddy?: boolean;
+}
+
+interface GodaddyReceiptPayload {
+  requestId: string;
+  requesterEmail: string;
+  requesterName: string;
+  vendorName: string;
+  orderId: string;
+  totalAmount: number;
+}
+
+interface ReceiptReuploadPayload {
+  requestId: string;
+  requesterEmail: string;
+  requesterName: string;
+  vendorName: string;
+  reason?: string;
+  approverName: string;
 }
 
 async function sendEmailWithResend(
@@ -215,6 +234,10 @@ function generateApprovalActionEmail(data: ApprovalActionPayload): { subject: st
   const actionText = data.action === "approved" ? "Approved" : "Rejected";
   const actionColor = data.action === "approved" ? "#10b981" : "#ef4444";
 
+  const godaddyNote = data.isGodaddy && data.action === "approved"
+    ? "\n\nNote: This is a GoDaddy purchase. Your receipt will be automatically imported once the order is detected in the company GoDaddy account."
+    : "";
+
   const subject = `Purchase Request ${actionText} - ${data.vendorName} ($${data.totalAmount.toLocaleString()})`;
 
   const text = `
@@ -230,7 +253,7 @@ ${data.comments ? `\nComments: ${data.comments}` : ""}
 
 ${data.action === "approved"
   ? "You may now proceed with the purchase."
-  : "Please contact the approver if you have questions."}
+  : "Please contact the approver if you have questions."}${godaddyNote}
 
 Best regards,
 SpendGuard Team
@@ -274,6 +297,123 @@ SpendGuard Team
       <p>${data.action === "approved"
         ? "You may now proceed with the purchase."
         : "Please contact the approver if you have questions."}</p>
+      <p style="color: #64748b; font-size: 14px; margin-top: 24px;">Best regards,<br>SpendGuard Team</p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  return { subject, text, html };
+}
+
+function generateGodaddyReceiptEmail(data: GodaddyReceiptPayload): { subject: string; text: string; html: string } {
+  const subject = `GoDaddy Receipt Imported - Order #${data.orderId}`;
+
+  const text = `
+Hi ${data.requesterName},
+
+Great news! Your GoDaddy receipt has been automatically imported.
+
+Order Details:
+- Order ID: ${data.orderId}
+- Vendor: ${data.vendorName}
+- Amount: $${data.totalAmount.toLocaleString()}
+
+The receipt has been attached to your purchase request and is ready for review.
+
+Best regards,
+SpendGuard Team
+  `.trim();
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #0d9488; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+    .content { background: #f8fafc; padding: 20px; border-radius: 0 0 8px 8px; }
+    .details { background: white; padding: 16px; border-radius: 8px; margin: 16px 0; border: 1px solid #e2e8f0; }
+    .detail-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f1f5f9; }
+    .detail-row:last-child { border-bottom: none; }
+    .badge { display: inline-block; background: #ccfbf1; color: #0d9488; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2 style="margin: 0;">GoDaddy Receipt Imported</h2>
+      <span class="badge">Auto-Imported</span>
+    </div>
+    <div class="content">
+      <p>Hi ${data.requesterName},</p>
+      <p>Great news! Your GoDaddy receipt has been automatically imported.</p>
+      <div class="details">
+        <div class="detail-row">
+          <span>Order ID</span>
+          <strong>#${data.orderId}</strong>
+        </div>
+        <div class="detail-row">
+          <span>Vendor</span>
+          <strong>${data.vendorName}</strong>
+        </div>
+        <div class="detail-row">
+          <span>Amount</span>
+          <strong>$${data.totalAmount.toLocaleString()}</strong>
+        </div>
+      </div>
+      <p>The receipt has been attached to your purchase request and is ready for review.</p>
+      <p style="color: #64748b; font-size: 14px; margin-top: 24px;">Best regards,<br>SpendGuard Team</p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  return { subject, text, html };
+}
+
+function generateReceiptReuploadEmail(data: ReceiptReuploadPayload): { subject: string; text: string; html: string } {
+  const subject = `Action Required: Receipt Re-upload Needed - ${data.vendorName}`;
+
+  const text = `
+Hi ${data.requesterName},
+
+${data.approverName} has requested a new receipt for your purchase from ${data.vendorName}.
+
+${data.reason ? `Reason: ${data.reason}` : "Please upload a clearer image of your receipt."}
+
+Please log in to SpendGuard and go to My Receipts to upload a new receipt.
+
+Best regards,
+SpendGuard Team
+  `.trim();
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1e293b; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #f97316; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
+    .content { background: #f8fafc; padding: 20px; border-radius: 0 0 8px 8px; }
+    .reason { background: #fef3c7; border: 1px solid #fcd34d; padding: 12px; border-radius: 8px; margin: 16px 0; }
+    .btn { display: inline-block; background: #f97316; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2 style="margin: 0;">Receipt Re-upload Required</h2>
+    </div>
+    <div class="content">
+      <p>Hi ${data.requesterName},</p>
+      <p>${data.approverName} has requested a new receipt for your purchase from <strong>${data.vendorName}</strong>.</p>
+      ${data.reason ? `<div class="reason"><strong>Reason:</strong> ${data.reason}</div>` : "<p>Please upload a clearer image of your receipt.</p>"}
+      <p>Please log in to SpendGuard and go to <strong>My Receipts</strong> to upload a new receipt.</p>
       <p style="color: #64748b; font-size: 14px; margin-top: 24px;">Best regards,<br>SpendGuard Team</p>
     </div>
   </div>
@@ -429,6 +569,68 @@ Deno.serve(async (req: Request) => {
           body_html: data.bodyHtml,
           related_entity_type: data.relatedEntityType,
           related_entity_id: data.relatedEntityId,
+          status: result.success ? "sent" : "failed",
+          sent_at: result.success ? new Date().toISOString() : null,
+        });
+        break;
+      }
+
+      case "godaddy_receipt": {
+        const data = payload as GodaddyReceiptPayload;
+        const email = generateGodaddyReceiptEmail(data);
+        const result = await sendEmailWithResend(
+          data.requesterEmail,
+          email.subject,
+          email.text,
+          email.html
+        );
+
+        if (result.success) {
+          results.sent.push(data.requesterEmail);
+        } else {
+          results.failed.push(data.requesterEmail);
+          results.errors.push(result.error || "Unknown error");
+        }
+
+        await supabaseAdmin.from("email_notifications").insert({
+          recipient_email: data.requesterEmail,
+          recipient_name: data.requesterName,
+          subject: email.subject,
+          body_text: email.text,
+          body_html: email.html,
+          related_entity_type: "purchase_request",
+          related_entity_id: data.requestId,
+          status: result.success ? "sent" : "failed",
+          sent_at: result.success ? new Date().toISOString() : null,
+        });
+        break;
+      }
+
+      case "receipt_reupload": {
+        const data = payload as ReceiptReuploadPayload;
+        const email = generateReceiptReuploadEmail(data);
+        const result = await sendEmailWithResend(
+          data.requesterEmail,
+          email.subject,
+          email.text,
+          email.html
+        );
+
+        if (result.success) {
+          results.sent.push(data.requesterEmail);
+        } else {
+          results.failed.push(data.requesterEmail);
+          results.errors.push(result.error || "Unknown error");
+        }
+
+        await supabaseAdmin.from("email_notifications").insert({
+          recipient_email: data.requesterEmail,
+          recipient_name: data.requesterName,
+          subject: email.subject,
+          body_text: email.text,
+          body_html: email.html,
+          related_entity_type: "purchase_request",
+          related_entity_id: data.requestId,
           status: result.success ? "sent" : "failed",
           sent_at: result.success ? new Date().toISOString() : null,
         });
