@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Wifi, CreditCard } from 'lucide-react';
+import { Wifi } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface PCardUsage {
@@ -29,7 +29,7 @@ export default function PCardWidget() {
       const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
       if (data) {
-        const rawData = Array.isArray(data) ? data[0] : data;
+        const rawData: any = Array.isArray(data) ? data[0] : data;
         setUsage({
           total_spent: rawData.current_usage || 0,
           remaining_balance: rawData.remaining || rawData.monthly_limit || 15000,

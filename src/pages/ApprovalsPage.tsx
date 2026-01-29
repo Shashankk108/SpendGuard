@@ -104,46 +104,46 @@ export default function ApprovalsPage() {
         <p className="text-slate-500 mt-1">Review and approve purchase requests</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6 sm:mb-8">
         <div className="lg:col-span-1">
           <PCardWidget />
         </div>
-        <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center">
-                <Clock className="w-5 h-5 text-amber-600" />
+        <div className="lg:col-span-3 grid grid-cols-3 gap-2 sm:gap-4">
+          <div className="bg-white rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm p-3 sm:p-6">
+            <div className="flex items-center justify-between mb-2 sm:mb-4">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-amber-50 rounded-lg flex items-center justify-center">
+                <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-slate-800">{pendingRequests.length}</p>
-            <p className="text-sm text-slate-500">Pending Requests</p>
+            <p className="text-lg sm:text-2xl font-bold text-slate-800">{pendingRequests.length}</p>
+            <p className="text-[10px] sm:text-sm text-slate-500">Pending</p>
           </div>
 
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-10 h-10 bg-sky-50 rounded-lg flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-sky-600" />
+          <div className="bg-white rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm p-3 sm:p-6">
+            <div className="flex items-center justify-between mb-2 sm:mb-4">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-sky-50 rounded-lg flex items-center justify-center">
+                <DollarSign className="w-4 h-4 sm:w-5 sm:h-5 text-sky-600" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-slate-800">
+            <p className="text-lg sm:text-2xl font-bold text-slate-800">
               $
               {pendingRequests
                 .reduce((sum, r) => sum + r.total_amount, 0)
                 .toLocaleString()}
             </p>
-            <p className="text-sm text-slate-500">Total Value Pending</p>
+            <p className="text-[10px] sm:text-sm text-slate-500">Total Value</p>
           </div>
 
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center">
-                <AlertTriangle className="w-5 h-5 text-red-600" />
+          <div className="bg-white rounded-xl sm:rounded-2xl border border-slate-200 shadow-sm p-3 sm:p-6">
+            <div className="flex items-center justify-between mb-2 sm:mb-4">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-red-50 rounded-lg flex items-center justify-center">
+                <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-slate-800">
+            <p className="text-lg sm:text-2xl font-bold text-slate-800">
               {pendingRequests.filter((r) => r.total_amount > 5000).length}
             </p>
-            <p className="text-sm text-slate-500">High-Value Requests (&gt;$5K)</p>
+            <p className="text-[10px] sm:text-sm text-slate-500">High-Value</p>
           </div>
         </div>
       </div>
@@ -164,42 +164,42 @@ export default function ApprovalsPage() {
               <Link
                 key={request.id}
                 to={`/request/${request.id}`}
-                className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors"
+                className="flex items-center justify-between p-3 sm:p-4 hover:bg-slate-50 transition-colors"
               >
-                <div className="flex items-center gap-4 flex-1 min-w-0">
-                  <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <Clock className="w-6 h-6 text-amber-600" />
+                <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-amber-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <p className="text-sm font-medium text-slate-800 truncate">
                         {request.vendor_name}
                       </p>
                       <span
-                        className={`px-2 py-0.5 rounded-full text-xs font-medium ${getUrgencyBadge(
+                        className={`hidden sm:inline px-2 py-0.5 rounded-full text-xs font-medium ${getUrgencyBadge(
                           request.total_amount
                         )}`}
                       >
                         {getApprovalTier(request.total_amount)}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500 truncate">{request.business_purpose}</p>
+                    <p className="text-xs text-slate-500 truncate hidden sm:block">{request.business_purpose}</p>
                     <div className="flex items-center gap-2 mt-1">
                       <User className="w-3 h-3 text-slate-400" />
-                      <p className="text-xs text-slate-400">
-                        {request.cardholder_name} &middot; {formatDate(request.created_at)}
+                      <p className="text-[10px] sm:text-xs text-slate-400 truncate">
+                        {request.cardholder_name} <span className="hidden xs:inline">&middot; {formatDate(request.created_at)}</span>
                       </p>
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-4 flex-shrink-0 ml-4">
+                <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0 ml-2 sm:ml-4">
                   <div className="text-right">
-                    <span className="text-lg font-semibold text-slate-800">
+                    <span className="text-base sm:text-lg font-semibold text-slate-800">
                       ${request.total_amount.toLocaleString()}
                     </span>
-                    <p className="text-xs text-slate-500">{request.category}</p>
+                    <p className="text-[10px] sm:text-xs text-slate-500 hidden sm:block">{request.category}</p>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-slate-400" />
+                  <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
                 </div>
               </Link>
             ))

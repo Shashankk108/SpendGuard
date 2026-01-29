@@ -17,8 +17,8 @@ export interface Database {
           p_card_name: string | null;
           department: string | null;
           role: string;
-          created_at: string;
-          updated_at: string;
+          created_at: string | null;
+          updated_at: string | null;
         };
         Insert: {
           id: string;
@@ -27,8 +27,8 @@ export interface Database {
           p_card_name?: string | null;
           department?: string | null;
           role?: string;
-          created_at?: string;
-          updated_at?: string;
+          created_at?: string | null;
+          updated_at?: string | null;
         };
         Update: {
           id?: string;
@@ -37,8 +37,8 @@ export interface Database {
           p_card_name?: string | null;
           department?: string | null;
           role?: string;
-          created_at?: string;
-          updated_at?: string;
+          created_at?: string | null;
+          updated_at?: string | null;
         };
       };
       approvers: {
@@ -52,7 +52,7 @@ export interface Database {
           max_amount: number | null;
           approval_order: number;
           is_active: boolean;
-          created_at: string;
+          created_at: string | null;
         };
         Insert: {
           id?: string;
@@ -64,7 +64,7 @@ export interface Database {
           max_amount?: number | null;
           approval_order?: number;
           is_active?: boolean;
-          created_at?: string;
+          created_at?: string | null;
         };
         Update: {
           id?: string;
@@ -76,7 +76,7 @@ export interface Database {
           max_amount?: number | null;
           approval_order?: number;
           is_active?: boolean;
-          created_at?: string;
+          created_at?: string | null;
         };
       };
       purchase_requests: {
@@ -90,23 +90,27 @@ export interface Database {
           vendor_location: string | null;
           purchase_amount: number;
           currency: string;
-          tax_amount: number;
-          shipping_amount: number;
+          tax_amount: number | null;
+          shipping_amount: number | null;
           total_amount: number;
           business_purpose: string;
           detailed_description: string;
           po_bypass_reason: string | null;
           po_bypass_explanation: string | null;
           category: string;
-          is_software_subscription: boolean;
-          it_license_confirmed: boolean;
-          is_preferred_vendor: boolean;
+          is_software_subscription: boolean | null;
+          it_license_confirmed: boolean | null;
+          is_preferred_vendor: boolean | null;
           status: string;
           employee_signature_url: string | null;
           employee_signed_at: string | null;
           rejection_reason: string | null;
-          created_at: string;
-          updated_at: string;
+          created_at: string | null;
+          updated_at: string | null;
+          receipt_status: string | null;
+          vendor_type: string | null;
+          external_order_id: string | null;
+          external_receipt_status: string | null;
         };
         Insert: {
           id?: string;
@@ -118,23 +122,27 @@ export interface Database {
           vendor_location?: string | null;
           purchase_amount: number;
           currency?: string;
-          tax_amount?: number;
-          shipping_amount?: number;
+          tax_amount?: number | null;
+          shipping_amount?: number | null;
           total_amount: number;
           business_purpose: string;
           detailed_description: string;
           po_bypass_reason?: string | null;
           po_bypass_explanation?: string | null;
           category: string;
-          is_software_subscription?: boolean;
-          it_license_confirmed?: boolean;
-          is_preferred_vendor?: boolean;
+          is_software_subscription?: boolean | null;
+          it_license_confirmed?: boolean | null;
+          is_preferred_vendor?: boolean | null;
           status?: string;
           employee_signature_url?: string | null;
           employee_signed_at?: string | null;
           rejection_reason?: string | null;
-          created_at?: string;
-          updated_at?: string;
+          created_at?: string | null;
+          updated_at?: string | null;
+          receipt_status?: string | null;
+          vendor_type?: string | null;
+          external_order_id?: string | null;
+          external_receipt_status?: string | null;
         };
         Update: {
           id?: string;
@@ -146,23 +154,27 @@ export interface Database {
           vendor_location?: string | null;
           purchase_amount?: number;
           currency?: string;
-          tax_amount?: number;
-          shipping_amount?: number;
+          tax_amount?: number | null;
+          shipping_amount?: number | null;
           total_amount?: number;
           business_purpose?: string;
           detailed_description?: string;
           po_bypass_reason?: string | null;
           po_bypass_explanation?: string | null;
           category?: string;
-          is_software_subscription?: boolean;
-          it_license_confirmed?: boolean;
-          is_preferred_vendor?: boolean;
+          is_software_subscription?: boolean | null;
+          it_license_confirmed?: boolean | null;
+          is_preferred_vendor?: boolean | null;
           status?: string;
           employee_signature_url?: string | null;
           employee_signed_at?: string | null;
           rejection_reason?: string | null;
-          created_at?: string;
-          updated_at?: string;
+          created_at?: string | null;
+          updated_at?: string | null;
+          receipt_status?: string | null;
+          vendor_type?: string | null;
+          external_order_id?: string | null;
+          external_receipt_status?: string | null;
         };
       };
       approval_signatures: {
@@ -175,7 +187,7 @@ export interface Database {
           signature_url: string | null;
           action: string;
           comments: string | null;
-          signed_at: string;
+          signed_at: string | null;
         };
         Insert: {
           id?: string;
@@ -186,7 +198,7 @@ export interface Database {
           signature_url?: string | null;
           action: string;
           comments?: string | null;
-          signed_at?: string;
+          signed_at?: string | null;
         };
         Update: {
           id?: string;
@@ -197,7 +209,7 @@ export interface Database {
           signature_url?: string | null;
           action?: string;
           comments?: string | null;
-          signed_at?: string;
+          signed_at?: string | null;
         };
       };
       supporting_documents: {
@@ -208,7 +220,7 @@ export interface Database {
           file_url: string;
           file_type: string | null;
           file_size: number | null;
-          uploaded_at: string;
+          uploaded_at: string | null;
         };
         Insert: {
           id?: string;
@@ -217,7 +229,7 @@ export interface Database {
           file_url: string;
           file_type?: string | null;
           file_size?: number | null;
-          uploaded_at?: string;
+          uploaded_at?: string | null;
         };
         Update: {
           id?: string;
@@ -226,7 +238,7 @@ export interface Database {
           file_url?: string;
           file_type?: string | null;
           file_size?: number | null;
-          uploaded_at?: string;
+          uploaded_at?: string | null;
         };
       };
       prohibited_categories: {
@@ -235,21 +247,21 @@ export interface Database {
           name: string;
           description: string | null;
           is_active: boolean;
-          created_at: string;
+          created_at: string | null;
         };
         Insert: {
           id?: string;
           name: string;
           description?: string | null;
           is_active?: boolean;
-          created_at?: string;
+          created_at?: string | null;
         };
         Update: {
           id?: string;
           name?: string;
           description?: string | null;
           is_active?: boolean;
-          created_at?: string;
+          created_at?: string | null;
         };
       };
       audit_logs: {
@@ -265,7 +277,7 @@ export interface Database {
           changes: Json | null;
           ip_address: string | null;
           user_agent: string | null;
-          created_at: string;
+          created_at: string | null;
         };
         Insert: {
           id?: string;
@@ -279,7 +291,7 @@ export interface Database {
           changes?: Json | null;
           ip_address?: string | null;
           user_agent?: string | null;
-          created_at?: string;
+          created_at?: string | null;
         };
         Update: {
           id?: string;
@@ -293,7 +305,7 @@ export interface Database {
           changes?: Json | null;
           ip_address?: string | null;
           user_agent?: string | null;
-          created_at?: string;
+          created_at?: string | null;
         };
       };
       email_notifications: {
@@ -307,7 +319,7 @@ export interface Database {
           related_entity_type: string | null;
           related_entity_id: string | null;
           status: string;
-          created_at: string;
+          created_at: string | null;
           sent_at: string | null;
         };
         Insert: {
@@ -320,7 +332,7 @@ export interface Database {
           related_entity_type?: string | null;
           related_entity_id?: string | null;
           status?: string;
-          created_at?: string;
+          created_at?: string | null;
           sent_at?: string | null;
         };
         Update: {
@@ -333,8 +345,517 @@ export interface Database {
           related_entity_type?: string | null;
           related_entity_id?: string | null;
           status?: string;
-          created_at?: string;
+          created_at?: string | null;
           sent_at?: string | null;
+        };
+      };
+      budgets: {
+        Row: {
+          id: string;
+          department: string;
+          fiscal_year: number;
+          fiscal_quarter: number | null;
+          allocated_amount: number;
+          start_date: string;
+          end_date: string;
+          notes: string | null;
+          created_by: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          department: string;
+          fiscal_year: number;
+          fiscal_quarter?: number | null;
+          allocated_amount?: number;
+          start_date: string;
+          end_date: string;
+          notes?: string | null;
+          created_by?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          department?: string;
+          fiscal_year?: number;
+          fiscal_quarter?: number | null;
+          allocated_amount?: number;
+          start_date?: string;
+          end_date?: string;
+          notes?: string | null;
+          created_by?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+      };
+      pcard_settings: {
+        Row: {
+          id: string;
+          card_name: string;
+          monthly_limit: number;
+          reset_day: number;
+          created_at: string | null;
+          updated_at: string | null;
+          hard_stop_enabled: boolean | null;
+          updated_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          card_name?: string;
+          monthly_limit?: number;
+          reset_day?: number;
+          created_at?: string | null;
+          updated_at?: string | null;
+          hard_stop_enabled?: boolean | null;
+          updated_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          card_name?: string;
+          monthly_limit?: number;
+          reset_day?: number;
+          created_at?: string | null;
+          updated_at?: string | null;
+          hard_stop_enabled?: boolean | null;
+          updated_by?: string | null;
+        };
+      };
+      purchase_receipts: {
+        Row: {
+          id: string;
+          request_id: string;
+          user_id: string;
+          file_name: string;
+          file_url: string;
+          file_type: string;
+          file_size: number | null;
+          uploaded_at: string | null;
+          notes: string | null;
+          verified: boolean | null;
+          verified_by: string | null;
+          verified_at: string | null;
+          created_at: string | null;
+          status: string | null;
+          employee_comment: string | null;
+          ai_verification_status: string | null;
+          ai_verification_data: Json | null;
+          ai_confidence_score: number | null;
+          ai_verified_at: string | null;
+          reupload_requested: boolean | null;
+          reupload_requested_at: string | null;
+          reupload_requested_by: string | null;
+          reupload_reason: string | null;
+          version: number | null;
+          previous_receipt_id: string | null;
+          is_current: boolean | null;
+        };
+        Insert: {
+          id?: string;
+          request_id: string;
+          user_id: string;
+          file_name: string;
+          file_url: string;
+          file_type?: string;
+          file_size?: number | null;
+          uploaded_at?: string | null;
+          notes?: string | null;
+          verified?: boolean | null;
+          verified_by?: string | null;
+          verified_at?: string | null;
+          created_at?: string | null;
+          status?: string | null;
+          employee_comment?: string | null;
+          ai_verification_status?: string | null;
+          ai_verification_data?: Json | null;
+          ai_confidence_score?: number | null;
+          ai_verified_at?: string | null;
+          reupload_requested?: boolean | null;
+          reupload_requested_at?: string | null;
+          reupload_requested_by?: string | null;
+          reupload_reason?: string | null;
+          version?: number | null;
+          previous_receipt_id?: string | null;
+          is_current?: boolean | null;
+        };
+        Update: {
+          id?: string;
+          request_id?: string;
+          user_id?: string;
+          file_name?: string;
+          file_url?: string;
+          file_type?: string;
+          file_size?: number | null;
+          uploaded_at?: string | null;
+          notes?: string | null;
+          verified?: boolean | null;
+          verified_by?: string | null;
+          verified_at?: string | null;
+          created_at?: string | null;
+          status?: string | null;
+          employee_comment?: string | null;
+          ai_verification_status?: string | null;
+          ai_verification_data?: Json | null;
+          ai_confidence_score?: number | null;
+          ai_verified_at?: string | null;
+          reupload_requested?: boolean | null;
+          reupload_requested_at?: string | null;
+          reupload_requested_by?: string | null;
+          reupload_reason?: string | null;
+          version?: number | null;
+          previous_receipt_id?: string | null;
+          is_current?: boolean | null;
+        };
+      };
+      receipt_responses: {
+        Row: {
+          id: string;
+          receipt_id: string;
+          responder_id: string;
+          action: string;
+          comment: string | null;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          receipt_id: string;
+          responder_id: string;
+          action: string;
+          comment?: string | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          receipt_id?: string;
+          responder_id?: string;
+          action?: string;
+          comment?: string | null;
+          created_at?: string | null;
+        };
+      };
+      receipt_analyses: {
+        Row: {
+          id: string;
+          receipt_id: string;
+          request_id: string;
+          extracted_vendor: string | null;
+          extracted_amount: number | null;
+          extracted_date: string | null;
+          extracted_items: Json | null;
+          vendor_match: boolean | null;
+          amount_match: boolean | null;
+          date_match: boolean | null;
+          confidence_score: number | null;
+          recommendation: string | null;
+          analysis_notes: string | null;
+          raw_extraction: Json | null;
+          analyzed_at: string | null;
+          created_at: string | null;
+          vendor_reason: string | null;
+          amount_reason: string | null;
+          date_reason: string | null;
+          expected_vendor: string | null;
+          expected_amount: number | null;
+          expected_date: string | null;
+        };
+        Insert: {
+          id?: string;
+          receipt_id: string;
+          request_id: string;
+          extracted_vendor?: string | null;
+          extracted_amount?: number | null;
+          extracted_date?: string | null;
+          extracted_items?: Json | null;
+          vendor_match?: boolean | null;
+          amount_match?: boolean | null;
+          date_match?: boolean | null;
+          confidence_score?: number | null;
+          recommendation?: string | null;
+          analysis_notes?: string | null;
+          raw_extraction?: Json | null;
+          analyzed_at?: string | null;
+          created_at?: string | null;
+          vendor_reason?: string | null;
+          amount_reason?: string | null;
+          date_reason?: string | null;
+          expected_vendor?: string | null;
+          expected_amount?: number | null;
+          expected_date?: string | null;
+        };
+        Update: {
+          id?: string;
+          receipt_id?: string;
+          request_id?: string;
+          extracted_vendor?: string | null;
+          extracted_amount?: number | null;
+          extracted_date?: string | null;
+          extracted_items?: Json | null;
+          vendor_match?: boolean | null;
+          amount_match?: boolean | null;
+          date_match?: boolean | null;
+          confidence_score?: number | null;
+          recommendation?: string | null;
+          analysis_notes?: string | null;
+          raw_extraction?: Json | null;
+          analyzed_at?: string | null;
+          created_at?: string | null;
+          vendor_reason?: string | null;
+          amount_reason?: string | null;
+          date_reason?: string | null;
+          expected_vendor?: string | null;
+          expected_amount?: number | null;
+          expected_date?: string | null;
+        };
+      };
+      deleted_data_backup: {
+        Row: {
+          id: string;
+          backup_type: string;
+          original_table: string;
+          original_id: string | null;
+          data: Json;
+          deleted_by: string | null;
+          deleted_at: string | null;
+          deletion_reason: string | null;
+          can_restore: boolean | null;
+          table_name: string | null;
+          record_count: number | null;
+          deleted_by_email: string | null;
+          restore_expires_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          backup_type: string;
+          original_table: string;
+          original_id?: string | null;
+          data: Json;
+          deleted_by?: string | null;
+          deleted_at?: string | null;
+          deletion_reason?: string | null;
+          can_restore?: boolean | null;
+          table_name?: string | null;
+          record_count?: number | null;
+          deleted_by_email?: string | null;
+          restore_expires_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          backup_type?: string;
+          original_table?: string;
+          original_id?: string | null;
+          data?: Json;
+          deleted_by?: string | null;
+          deleted_at?: string | null;
+          deletion_reason?: string | null;
+          can_restore?: boolean | null;
+          table_name?: string | null;
+          record_count?: number | null;
+          deleted_by_email?: string | null;
+          restore_expires_at?: string | null;
+        };
+      };
+      notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: string;
+          title: string;
+          message: string;
+          action_url: string | null;
+          metadata: Json | null;
+          is_read: boolean | null;
+          created_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          type: string;
+          title: string;
+          message: string;
+          action_url?: string | null;
+          metadata?: Json | null;
+          is_read?: boolean | null;
+          created_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          type?: string;
+          title?: string;
+          message?: string;
+          action_url?: string | null;
+          metadata?: Json | null;
+          is_read?: boolean | null;
+          created_at?: string | null;
+        };
+      };
+      godaddy_orders: {
+        Row: {
+          id: string;
+          order_id: string;
+          domain_or_product: string;
+          product_type: string | null;
+          order_date: string;
+          order_total: number;
+          currency: string | null;
+          receipt_url: string | null;
+          receipt_data: string | null;
+          raw_api_response: Json | null;
+          sync_status: string | null;
+          matched_request_id: string | null;
+          match_confidence: number | null;
+          match_reasons: Json | null;
+          synced_at: string | null;
+          created_at: string | null;
+          updated_at: string | null;
+          receipt_requested: boolean | null;
+          receipt_requested_at: string | null;
+          receipt_requested_by: string | null;
+          receipt_file_path: string | null;
+          receipt_uploaded_at: string | null;
+          receipt_uploaded_by: string | null;
+          assigned_employee_id: string | null;
+          receipt_request_message: string | null;
+          receipt_uploaded: boolean | null;
+          receipt_file_url: string | null;
+          receipt_file_name: string | null;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          domain_or_product: string;
+          product_type?: string | null;
+          order_date: string;
+          order_total: number;
+          currency?: string | null;
+          receipt_url?: string | null;
+          receipt_data?: string | null;
+          raw_api_response?: Json | null;
+          sync_status?: string | null;
+          matched_request_id?: string | null;
+          match_confidence?: number | null;
+          match_reasons?: Json | null;
+          synced_at?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+          receipt_requested?: boolean | null;
+          receipt_requested_at?: string | null;
+          receipt_requested_by?: string | null;
+          receipt_file_path?: string | null;
+          receipt_uploaded_at?: string | null;
+          receipt_uploaded_by?: string | null;
+          assigned_employee_id?: string | null;
+          receipt_request_message?: string | null;
+          receipt_uploaded?: boolean | null;
+          receipt_file_url?: string | null;
+          receipt_file_name?: string | null;
+        };
+        Update: {
+          id?: string;
+          order_id?: string;
+          domain_or_product?: string;
+          product_type?: string | null;
+          order_date?: string;
+          order_total?: number;
+          currency?: string | null;
+          receipt_url?: string | null;
+          receipt_data?: string | null;
+          raw_api_response?: Json | null;
+          sync_status?: string | null;
+          matched_request_id?: string | null;
+          match_confidence?: number | null;
+          match_reasons?: Json | null;
+          synced_at?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+          receipt_requested?: boolean | null;
+          receipt_requested_at?: string | null;
+          receipt_requested_by?: string | null;
+          receipt_file_path?: string | null;
+          receipt_uploaded_at?: string | null;
+          receipt_uploaded_by?: string | null;
+          assigned_employee_id?: string | null;
+          receipt_request_message?: string | null;
+          receipt_uploaded?: boolean | null;
+          receipt_file_url?: string | null;
+          receipt_file_name?: string | null;
+        };
+      };
+      external_vendor_sync: {
+        Row: {
+          id: string;
+          vendor_type: string;
+          last_sync_at: string | null;
+          next_sync_at: string | null;
+          orders_synced: number | null;
+          orders_matched: number | null;
+          status: string | null;
+          error_message: string | null;
+          sync_config: Json | null;
+          created_at: string | null;
+          updated_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          vendor_type: string;
+          last_sync_at?: string | null;
+          next_sync_at?: string | null;
+          orders_synced?: number | null;
+          orders_matched?: number | null;
+          status?: string | null;
+          error_message?: string | null;
+          sync_config?: Json | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          vendor_type?: string;
+          last_sync_at?: string | null;
+          next_sync_at?: string | null;
+          orders_synced?: number | null;
+          orders_matched?: number | null;
+          status?: string | null;
+          error_message?: string | null;
+          sync_config?: Json | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+      };
+      godaddy_receipt_requests: {
+        Row: {
+          id: string;
+          order_id: string;
+          requested_by: string;
+          assigned_to: string | null;
+          message: string | null;
+          status: string;
+          created_at: string | null;
+          responded_at: string | null;
+          response_notes: string | null;
+        };
+        Insert: {
+          id?: string;
+          order_id: string;
+          requested_by: string;
+          assigned_to?: string | null;
+          message?: string | null;
+          status?: string;
+          created_at?: string | null;
+          responded_at?: string | null;
+          response_notes?: string | null;
+        };
+        Update: {
+          id?: string;
+          order_id?: string;
+          requested_by?: string;
+          assigned_to?: string | null;
+          message?: string | null;
+          status?: string;
+          created_at?: string | null;
+          responded_at?: string | null;
+          response_notes?: string | null;
         };
       };
     };
@@ -349,20 +870,16 @@ export type SupportingDocument = Database['public']['Tables']['supporting_docume
 export type ProhibitedCategory = Database['public']['Tables']['prohibited_categories']['Row'];
 export type AuditLog = Database['public']['Tables']['audit_logs']['Row'];
 export type EmailNotification = Database['public']['Tables']['email_notifications']['Row'];
-
-export interface Budget {
-  id: string;
-  department: string;
-  fiscal_year: number;
-  fiscal_quarter: number | null;
-  allocated_amount: number;
-  start_date: string;
-  end_date: string;
-  notes: string | null;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-}
+export type Budget = Database['public']['Tables']['budgets']['Row'];
+export type PCardSettings = Database['public']['Tables']['pcard_settings']['Row'];
+export type PurchaseReceipt = Database['public']['Tables']['purchase_receipts']['Row'];
+export type ReceiptResponse = Database['public']['Tables']['receipt_responses']['Row'];
+export type ReceiptAnalysis = Database['public']['Tables']['receipt_analyses']['Row'];
+export type DeletedDataBackup = Database['public']['Tables']['deleted_data_backup']['Row'];
+export type Notification = Database['public']['Tables']['notifications']['Row'];
+export type GoDaddyOrder = Database['public']['Tables']['godaddy_orders']['Row'];
+export type ExternalVendorSync = Database['public']['Tables']['external_vendor_sync']['Row'];
+export type GoDaddyReceiptRequest = Database['public']['Tables']['godaddy_receipt_requests']['Row'];
 
 export type RequestStatus = 'draft' | 'pending' | 'approved' | 'rejected';
 export type POBypassReason = 'vendor_limitations' | 'time_sensitivity' | 'other';

@@ -264,51 +264,54 @@ export default function DashboardPage() {
           <p className="text-slate-500 mt-1">Leadership overview of all purchase requests</p>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-          <div className="bg-white rounded-xl border border-slate-200 p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center">
-                <Users className="w-4 h-4 text-slate-600" />
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-4 mb-6">
+          <div className="bg-white rounded-xl border border-slate-200 p-2.5 sm:p-4">
+            <div className="flex items-center gap-1.5 sm:gap-2 mb-1 sm:mb-2">
+              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-slate-100 rounded-lg flex items-center justify-center">
+                <Users className="w-3 h-3 sm:w-4 sm:h-4 text-slate-600" />
               </div>
-              <span className="text-xs text-slate-500">Total Requests</span>
+              <span className="text-[10px] sm:text-xs text-slate-500 hidden sm:inline">Total</span>
             </div>
-            <p className="text-2xl font-bold text-slate-800">{teamStats.total}</p>
+            <p className="text-lg sm:text-2xl font-bold text-slate-800">{teamStats.total}</p>
+            <p className="text-[10px] text-slate-500 sm:hidden">Total</p>
           </div>
-          <div className="bg-white rounded-xl border border-amber-200 p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center">
-                <Clock className="w-4 h-4 text-amber-600" />
+          <div className="bg-white rounded-xl border border-amber-200 p-2.5 sm:p-4">
+            <div className="flex items-center gap-1.5 sm:gap-2 mb-1 sm:mb-2">
+              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-amber-50 rounded-lg flex items-center justify-center">
+                <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-amber-600" />
               </div>
-              <span className="text-xs text-slate-500">Pending</span>
+              <span className="text-[10px] sm:text-xs text-slate-500 hidden sm:inline">Pending</span>
             </div>
-            <p className="text-2xl font-bold text-amber-600">{teamStats.pending}</p>
+            <p className="text-lg sm:text-2xl font-bold text-amber-600">{teamStats.pending}</p>
+            <p className="text-[10px] text-slate-500 sm:hidden">Pending</p>
           </div>
-          <div className="bg-white rounded-xl border border-emerald-200 p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+          <div className="bg-white rounded-xl border border-emerald-200 p-2.5 sm:p-4">
+            <div className="flex items-center gap-1.5 sm:gap-2 mb-1 sm:mb-2">
+              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-emerald-50 rounded-lg flex items-center justify-center">
+                <CheckCircle2 className="w-3 h-3 sm:w-4 sm:h-4 text-emerald-600" />
               </div>
-              <span className="text-xs text-slate-500">Approved</span>
+              <span className="text-[10px] sm:text-xs text-slate-500 hidden sm:inline">Approved</span>
             </div>
-            <p className="text-2xl font-bold text-emerald-600">{teamStats.approved}</p>
+            <p className="text-lg sm:text-2xl font-bold text-emerald-600">{teamStats.approved}</p>
+            <p className="text-[10px] text-slate-500 sm:hidden">Approved</p>
           </div>
-          <div className="bg-white rounded-xl border border-red-200 p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 bg-red-50 rounded-lg flex items-center justify-center">
-                <XCircle className="w-4 h-4 text-red-600" />
+          <div className="bg-white rounded-xl border border-red-200 p-2.5 sm:p-4 hidden sm:block">
+            <div className="flex items-center gap-1.5 sm:gap-2 mb-1 sm:mb-2">
+              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-red-50 rounded-lg flex items-center justify-center">
+                <XCircle className="w-3 h-3 sm:w-4 sm:h-4 text-red-600" />
               </div>
-              <span className="text-xs text-slate-500">Rejected</span>
+              <span className="text-[10px] sm:text-xs text-slate-500 hidden sm:inline">Rejected</span>
             </div>
-            <p className="text-2xl font-bold text-red-600">{teamStats.rejected}</p>
+            <p className="text-lg sm:text-2xl font-bold text-red-600">{teamStats.rejected}</p>
           </div>
-          <div className="bg-white rounded-xl border border-teal-200 p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 bg-teal-50 rounded-lg flex items-center justify-center">
-                <TrendingUp className="w-4 h-4 text-teal-600" />
+          <div className="bg-white rounded-xl border border-teal-200 p-2.5 sm:p-4 hidden sm:block">
+            <div className="flex items-center gap-1.5 sm:gap-2 mb-1 sm:mb-2">
+              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-teal-50 rounded-lg flex items-center justify-center">
+                <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-teal-600" />
               </div>
-              <span className="text-xs text-slate-500">Team Spending</span>
+              <span className="text-[10px] sm:text-xs text-slate-500 hidden sm:inline">Spending</span>
             </div>
-            <p className="text-xl font-bold text-teal-600">${teamStats.totalAmount.toLocaleString()}</p>
+            <p className="text-base sm:text-xl font-bold text-teal-600">${teamStats.totalAmount.toLocaleString()}</p>
           </div>
         </div>
 
@@ -642,7 +645,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 mb-6 sm:mb-8">
         <StatCard
           title="Pending"
           value={stats.pending}
@@ -662,7 +665,7 @@ export default function DashboardPage() {
           color="red"
         />
         <StatCard
-          title="Receipts Needed"
+          title="Receipts"
           value={stats.receiptsNeeded}
           icon={Receipt}
           color="orange"
@@ -914,19 +917,19 @@ function StatCard({ title, value, icon: Icon, color, highlight }: StatCardProps)
   };
 
   return (
-    <div className={`bg-white rounded-xl border shadow-sm p-5 ${highlight ? 'border-orange-300 ring-1 ring-orange-200' : 'border-slate-200'}`}>
-      <div className="flex items-center justify-between mb-3">
-        <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${colors[color]}`}>
-          <Icon className="w-5 h-5" />
+    <div className={`bg-white rounded-xl border shadow-sm p-3 sm:p-5 ${highlight ? 'border-orange-300 ring-1 ring-orange-200' : 'border-slate-200'}`}>
+      <div className="flex items-center justify-between mb-2 sm:mb-3">
+        <div className={`w-7 h-7 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center ${colors[color]}`}>
+          <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
         </div>
         {highlight && (
-          <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-semibold rounded-full">
-            Action Required
+          <span className="hidden sm:inline px-2 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-semibold rounded-full">
+            Action
           </span>
         )}
       </div>
-      <p className="text-2xl font-bold text-slate-800">{value}</p>
-      <p className="text-sm text-slate-500">{title}</p>
+      <p className="text-xl sm:text-2xl font-bold text-slate-800">{value}</p>
+      <p className="text-xs sm:text-sm text-slate-500">{title}</p>
     </div>
   );
 }

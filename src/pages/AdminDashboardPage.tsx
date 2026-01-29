@@ -28,12 +28,14 @@ import {
   Archive,
   X,
   Zap,
+  BookOpen,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import PCardWidget from '../components/PCardWidget';
+import UserStoriesTab from '../components/admin/UserStoriesTab';
 import type { AuditLog, EmailNotification, Profile } from '../types/database';
 
-type TabType = 'overview' | 'sql' | 'audit' | 'emails' | 'users' | 'controls';
+type TabType = 'overview' | 'stories' | 'sql' | 'audit' | 'emails' | 'users' | 'controls';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -265,9 +267,14 @@ export default function AdminDashboardPage() {
   const [employeeStats, setEmployeeStats] = useState<EmployeeStats | null>(null);
   const [employeeLoading, setEmployeeLoading] = useState(false);
   const [employeeSearch, setEmployeeSearch] = useState('');
+  const [godaddyKey, setGodaddyKey] = useState('');
+  const [godaddySecret, setGodaddySecret] = useState('');
+  const [godaddyShopperId, setGodaddyShopperId] = useState('');
+  const [godaddyConfigured, setGodaddyConfigured] = useState(false);
 
   useEffect(() => {
     loadData();
+    loadGodaddyCredentials();
   }, []);
 
   async function loadData() {
@@ -340,6 +347,51 @@ export default function AdminDashboardPage() {
       .select('*')
       .order('created_at', { ascending: false });
     if (data) setUsers(data);
+  }
+
+  async function loadGodaddyCredentials() {
+    const { data } = await supabase
+      .from('api_credentials')
+      .select('*')
+      .eq('service_name', 'godaddy')
+      .maybeSingle();
+
+    if (data) {
+      setGodaddyKey(data.api_key || '');
+      setGodaddySecret(data.api_secret || '');
+      setGodaddyShopperId(data.shopper_id || '');
+      setGodaddyConfigured(true);
+    }
+  }
+
+  async function handleSaveGodaddyCredentials() {
+    if (!godaddyKey.trim() || !godaddySecret.trim()) {
+      setControlMessage({ type: 'error', text: 'API Key and Secret are required' });
+      return;
+    }
+
+    setControlLoading('godaddy');
+    setControlMessage(null);
+
+    const { error } = await supabase.rpc('upsert_api_credentials', {
+      p_service_name: 'godaddy',
+      p_api_key: godaddyKey.trim(),
+      p_api_secret: godaddySecret.trim(),
+      p_shopper_id: godaddyShopperId.trim() || null,
+      p_additional_config: {}
+    });
+
+    if (error) {
+      setControlMessage({ type: 'error', text: error.message });
+    } else {
+      setGodaddyConfigured(true);
+      setControlMessage({
+        type: 'success',
+        text: 'GoDaddy credentials saved successfully! Restart your Edge Functions for changes to take effect.'
+      });
+      await loadAuditLogs();
+    }
+    setControlLoading(null);
   }
 
   async function executeQuery() {
@@ -532,6 +584,7 @@ export default function AdminDashboardPage() {
       <div className="flex gap-2 border-b border-slate-200 overflow-x-auto pb-px">
         {[
           { id: 'overview', label: 'Overview', icon: TrendingUp },
+          { id: 'stories', label: 'User Stories', icon: BookOpen },
           { id: 'controls', label: 'Admin Controls', icon: Settings },
           { id: 'sql', label: 'SQL Console', icon: Database },
           { id: 'audit', label: 'Audit Trail', icon: History },
@@ -687,6 +740,8 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
+      {activeTab === 'stories' && <UserStoriesTab />}
+
       {activeTab === 'controls' && (
         <div className="space-y-6">
           {controlMessage && (
@@ -706,6 +761,79 @@ export default function AdminDashboardPage() {
               </button>
             </div>
           )}
+
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="px-5 py-4 bg-slate-50 border-b border-slate-200 flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Settings className="w-5 h-5 text-blue-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-slate-800">GoDaddy API Integration</h3>
+                <p className="text-xs text-slate-500">Configure GoDaddy API credentials for automatic receipt syncing</p>
+              </div>
+              {godaddyConfigured && (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-100 rounded-lg">
+                  <CheckCircle className="w-4 h-4 text-emerald-600" />
+                  <span className="text-xs font-medium text-emerald-700">Configured</span>
+                </div>
+              )}
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  API Key <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={godaddyKey}
+                  onChange={(e) => setGodaddyKey(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                  placeholder="dLP4wKzdXY7_VTMfBgHvCcXF5VUjkQKLXvW"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  API Secret <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  value={godaddySecret}
+                  onChange={(e) => setGodaddySecret(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                  placeholder="JbHcZ5PqXxR2Y8nKmQwL"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Shopper ID <span className="text-slate-400">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={godaddyShopperId}
+                  onChange={(e) => setGodaddyShopperId(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                  placeholder="123456789"
+                />
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm">
+                <p className="font-medium text-blue-800 mb-2">How to get your GoDaddy credentials:</p>
+                <ol className="list-decimal list-inside space-y-1 text-blue-700">
+                  <li>Visit <a href="https://developer.godaddy.com/keys" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-900">GoDaddy Developer Portal</a></li>
+                  <li>Create a new API key in Production environment</li>
+                  <li>Copy both the Key and Secret immediately</li>
+                  <li>Find your Shopper ID in your GoDaddy account settings</li>
+                </ol>
+              </div>
+              <button
+                onClick={handleSaveGodaddyCredentials}
+                disabled={controlLoading === 'godaddy'}
+                className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                {controlLoading === 'godaddy' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                Save GoDaddy Credentials
+              </button>
+            </div>
+          </div>
 
           <div className="grid lg:grid-cols-2 gap-6">
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">

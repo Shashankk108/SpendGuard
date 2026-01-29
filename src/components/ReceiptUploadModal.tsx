@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { X, Upload, Image, FileText, CheckCircle, AlertCircle } from 'lucide-react';
+import { X, Upload, FileText, CheckCircle, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -93,13 +93,13 @@ export default function ReceiptUploadModal({ request, onClose, onSuccess }: Rece
             notes: notes || null,
             employee_comment: notes || null,
             status: 'pending',
-          });
+          } as any);
 
         if (insertError) throw insertError;
 
         await supabase
           .from('purchase_requests')
-          .update({ receipt_status: 'uploaded' })
+          .update({ receipt_status: 'uploaded' } as any)
           .eq('id', request.id);
 
         setSuccess(true);

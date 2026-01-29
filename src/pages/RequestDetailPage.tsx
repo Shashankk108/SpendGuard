@@ -426,13 +426,13 @@ export default function RequestDetailPage() {
       </Link>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
-        <div className="p-6 border-b border-slate-200">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-xl font-bold text-slate-800">{request.vendor_name}</h1>
+        <div className="p-4 sm:p-6 border-b border-slate-200">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
+                <h1 className="text-lg sm:text-xl font-bold text-slate-800 break-words">{request.vendor_name}</h1>
                 <span
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${getStatusBadge(
+                  className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-medium ${getStatusBadge(
                     request.status
                   )}`}
                 >
@@ -440,21 +440,24 @@ export default function RequestDetailPage() {
                   {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
                 </span>
               </div>
-              <p className="text-slate-500">{request.business_purpose}</p>
+              <p className="text-sm sm:text-base text-slate-500">{request.business_purpose}</p>
             </div>
-            <div className="text-right">
-              <p className="text-3xl font-bold text-slate-800">
-                ${request.total_amount.toLocaleString()}
-              </p>
-              <p className="text-sm text-slate-500 mt-1">{getApprovalTier(request.total_amount)}</p>
+            <div className="flex items-center justify-between sm:block sm:text-right flex-shrink-0">
+              <div>
+                <p className="text-2xl sm:text-3xl font-bold text-slate-800">
+                  ${request.total_amount.toLocaleString()}
+                </p>
+                <p className="text-xs sm:text-sm text-slate-500 mt-1">{getApprovalTier(request.total_amount)}</p>
+              </div>
               {(request.status === 'approved' || request.status === 'rejected') && (
                 <button
                   onClick={handleExportPDF}
                   disabled={exporting}
-                  className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-slate-800 text-white text-sm font-medium rounded-xl hover:bg-slate-700 disabled:opacity-50 transition-colors"
+                  className="sm:mt-3 inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-slate-800 text-white text-xs sm:text-sm font-medium rounded-xl hover:bg-slate-700 disabled:opacity-50 transition-colors"
                 >
                   <FileDown className="w-4 h-4" />
-                  {exporting ? 'Exporting...' : 'Export PDF'}
+                  <span className="hidden sm:inline">{exporting ? 'Exporting...' : 'Export PDF'}</span>
+                  <span className="sm:hidden">{exporting ? '...' : 'PDF'}</span>
                 </button>
               )}
             </div>
@@ -479,7 +482,7 @@ export default function RequestDetailPage() {
           />
         </div>
 
-        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           <div className="space-y-6">
             <Section title="Requestor Information">
               <InfoRow icon={User} label="Requestor Name" value={request.cardholder_name} />
@@ -842,32 +845,32 @@ export default function RequestDetailPage() {
         </div>
 
         {isApprover && request.status === 'pending' && !hasAlreadyActioned && !checkingApprover && (
-          <div className="p-6 border-t border-slate-200 bg-slate-50">
-            <h3 className="text-lg font-semibold text-slate-800 mb-4">Approval Action</h3>
+          <div className="p-4 sm:p-6 border-t border-slate-200 bg-slate-50">
+            <h3 className="text-base sm:text-lg font-semibold text-slate-800 mb-4">Approval Action</h3>
 
             {approvalError && (
-              <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5 text-red-600" />
+              <div className="mb-4 p-3 sm:p-4 bg-red-50 border border-red-200 rounded-xl">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0" />
                   <p className="text-sm text-red-700">{approvalError}</p>
                 </div>
               </div>
             )}
 
-            <div className="mb-6">
+            <div className="mb-4 sm:mb-6">
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Comments <span className="text-slate-400">(required for rejection)</span>
               </label>
               <textarea
                 value={comments}
                 onChange={(e) => setComments(e.target.value)}
-                rows={3}
+                rows={2}
                 placeholder="Add any comments or notes..."
-                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none"
+                className="w-full px-3 sm:px-4 py-2 sm:py-3 bg-white border border-slate-200 rounded-xl text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 resize-none text-sm sm:text-base"
               />
             </div>
 
-            <div className="mb-6">
+            <div className="mb-4 sm:mb-6">
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Approver Signature <span className="text-red-500">*</span>
               </label>
@@ -884,10 +887,10 @@ export default function RequestDetailPage() {
             </div>
 
             {!approverSignature && (
-              <p className="mb-4 text-sm text-slate-500">Please provide your signature to enable the action buttons.</p>
+              <p className="mb-4 text-xs sm:text-sm text-slate-500">Please provide your signature to enable the action buttons.</p>
             )}
 
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
               <button
                 onClick={() => handleApproval('approved')}
                 disabled={submitting || !approverSignature}
@@ -919,22 +922,22 @@ export default function RequestDetailPage() {
       </div>
 
       {viewingReceipt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setViewingReceipt(null)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-auto">
-            <div className="sticky top-0 px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-white z-10">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">Receipt</h2>
-                <p className="text-sm text-slate-500">{viewingReceipt.file_name}</p>
+          <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-3xl max-h-[95vh] sm:max-h-[90vh] overflow-auto">
+            <div className="sticky top-0 px-4 sm:px-6 py-3 sm:py-4 border-b border-slate-100 flex items-center justify-between bg-white z-10">
+              <div className="min-w-0 mr-2">
+                <h2 className="text-base sm:text-lg font-semibold text-slate-900">Receipt</h2>
+                <p className="text-xs sm:text-sm text-slate-500 truncate">{viewingReceipt.file_name}</p>
               </div>
               <button
                 onClick={() => setViewingReceipt(null)}
-                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors flex-shrink-0"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-6">
+            <div className="p-4 sm:p-6">
               {viewingReceipt.file_type?.startsWith('image/') ? (
                 <img
                   src={viewingReceipt.file_url}

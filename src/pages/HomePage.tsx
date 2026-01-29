@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, CreditCard, CheckCircle, User, UserCheck, Settings, Loader2 } from 'lucide-react';
+import { Shield, CreditCard, CheckCircle, User, UserCheck, Settings, Loader2, ChevronDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 const DEMO_ACCOUNTS = [
@@ -45,6 +45,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [showDemoAccounts, setShowDemoAccounts] = useState(false);
 
   const handleDemoLogin = async (demoEmail: string, demoPassword: string) => {
     setError('');
@@ -230,41 +231,59 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
-              <h3 className="text-white font-semibold text-center mb-1">Try Demo Accounts</h3>
-              <p className="text-blue-200/70 text-xs text-center mb-4">
-                Explore the system with pre-configured test accounts
-              </p>
-              <div className="space-y-3">
-                {DEMO_ACCOUNTS.map((account) => (
-                  <button
-                    key={account.email}
-                    onClick={() => handleDemoLogin(account.email, account.password)}
-                    disabled={demoLoading !== null}
-                    className="w-full flex items-center gap-4 p-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
-                  >
-                    <div className={`w-10 h-10 ${account.color} rounded-lg flex items-center justify-center flex-shrink-0`}>
-                      {demoLoading === account.email ? (
-                        <Loader2 className="w-5 h-5 text-white animate-spin" />
-                      ) : (
-                        <account.icon className="w-5 h-5 text-white" />
-                      )}
-                    </div>
-                    <div className="flex-1 text-left">
-                      <div className="flex items-center gap-2">
-                        <span className="text-white font-medium text-sm">{account.name}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
-                          account.role === 'Admin' ? 'bg-amber-500/20 text-amber-300' :
-                          account.role === 'Approver' ? 'bg-emerald-500/20 text-emerald-300' :
-                          'bg-blue-500/20 text-blue-300'
-                        }`}>
-                          {account.role}
-                        </span>
+            <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20 overflow-hidden">
+              <button
+                onClick={() => setShowDemoAccounts(!showDemoAccounts)}
+                className="w-full p-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+              >
+                <div className="text-left">
+                  <h3 className="text-white font-semibold">Try Demo Accounts</h3>
+                  <p className="text-blue-200/70 text-xs">
+                    Explore the system with pre-configured test accounts
+                  </p>
+                </div>
+                <ChevronDown
+                  className={`w-5 h-5 text-blue-200 transition-transform duration-300 ${
+                    showDemoAccounts ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+              <div
+                className={`transition-all duration-300 ease-in-out overflow-hidden ${
+                  showDemoAccounts ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                }`}
+              >
+                <div className="px-4 pb-4 space-y-3">
+                  {DEMO_ACCOUNTS.map((account) => (
+                    <button
+                      key={account.email}
+                      onClick={() => handleDemoLogin(account.email, account.password)}
+                      disabled={demoLoading !== null}
+                      className="w-full flex items-center gap-4 p-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+                    >
+                      <div className={`w-10 h-10 ${account.color} rounded-lg flex items-center justify-center flex-shrink-0`}>
+                        {demoLoading === account.email ? (
+                          <Loader2 className="w-5 h-5 text-white animate-spin" />
+                        ) : (
+                          <account.icon className="w-5 h-5 text-white" />
+                        )}
                       </div>
-                      <p className="text-blue-200/60 text-xs">{account.description}</p>
-                    </div>
-                  </button>
-                ))}
+                      <div className="flex-1 text-left">
+                        <div className="flex items-center gap-2">
+                          <span className="text-white font-medium text-sm">{account.name}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            account.role === 'Admin' ? 'bg-amber-500/20 text-amber-300' :
+                            account.role === 'Approver' ? 'bg-emerald-500/20 text-emerald-300' :
+                            'bg-blue-500/20 text-blue-300'
+                          }`}>
+                            {account.role}
+                          </span>
+                        </div>
+                        <p className="text-blue-200/60 text-xs">{account.description}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 

@@ -139,20 +139,20 @@ export default function AllRequestsTab() {
     }
 
     if (dateFrom) {
-      filtered = filtered.filter((r) => new Date(r.created_at) >= new Date(dateFrom));
+      filtered = filtered.filter((r) => r.created_at && new Date(r.created_at) >= new Date(dateFrom));
     }
 
     if (dateTo) {
       const toDate = new Date(dateTo);
       toDate.setHours(23, 59, 59, 999);
-      filtered = filtered.filter((r) => new Date(r.created_at) <= toDate);
+      filtered = filtered.filter((r) => r.created_at && new Date(r.created_at) <= toDate);
     }
 
     filtered.sort((a, b) => {
       let comparison = 0;
       switch (sortField) {
         case 'created_at':
-          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          comparison = (a.created_at ? new Date(a.created_at).getTime() : 0) - (b.created_at ? new Date(b.created_at).getTime() : 0);
           break;
         case 'total_amount':
           comparison = a.total_amount - b.total_amount;
@@ -197,7 +197,7 @@ export default function AllRequestsTab() {
       'Business Purpose',
     ];
     const rows = filteredRequests.map((r) => [
-      new Date(r.created_at).toLocaleDateString(),
+      r.created_at ? new Date(r.created_at).toLocaleDateString() : 'N/A',
       r.vendor_name,
       r.cardholder_name,
       r.category,
@@ -428,7 +428,7 @@ export default function AllRequestsTab() {
             {paginatedRequests.map((request) => (
               <tr key={request.id} className="hover:bg-slate-50 transition-colors">
                 <td className="py-3 px-4 text-sm text-slate-600">
-                  {new Date(request.created_at).toLocaleDateString()}
+                  {request.created_at ? new Date(request.created_at).toLocaleDateString() : 'N/A'}
                 </td>
                 <td className="py-3 px-4">
                   <p className="text-sm font-medium text-slate-800">{request.vendor_name}</p>
@@ -603,7 +603,7 @@ export default function AllRequestsTab() {
                           </span>
                         </div>
                         <p className="text-xs text-slate-500 mt-1">
-                          {sig.approver_title} - {new Date(sig.signed_at).toLocaleString()}
+                          {sig.approver_title} - {sig.signed_at ? new Date(sig.signed_at).toLocaleString() : 'N/A'}
                         </p>
                         {sig.comments && (
                           <p className="text-sm text-slate-600 mt-2">{sig.comments}</p>

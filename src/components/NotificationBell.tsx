@@ -9,7 +9,6 @@ import {
   Globe,
   Info,
   Check,
-  X,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -123,7 +122,7 @@ export default function NotificationBell() {
   async function markAsRead(notificationId: string) {
     await supabase
       .from('notifications')
-      .update({ is_read: true })
+      .update({ is_read: true } as any)
       .eq('id', notificationId);
 
     setNotifications((prev) =>

@@ -370,14 +370,14 @@ export default function NewRequestPage() {
         </div>
       )}
 
-      <div className="flex gap-8">
-        <div className="flex-1">
-          <div className="mb-8">
-            <div className="flex items-center justify-between">
+      <div className="flex flex-col lg:flex-row gap-6 lg:gap-8">
+        <div className="flex-1 order-2 lg:order-1">
+          <div className="mb-6 lg:mb-8">
+            <div className="hidden sm:flex items-center justify-between">
               {STEPS.map((step, index) => (
                 <div key={step.id} className="flex items-center">
                   <div
-                    className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all ${
+                    className={`flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 transition-all ${
                       currentStep > step.id
                         ? 'bg-sky-600 border-sky-600 text-white'
                         : currentStep === step.id
@@ -386,14 +386,14 @@ export default function NewRequestPage() {
                     }`}
                   >
                     {currentStep > step.id ? (
-                      <Check className="w-5 h-5" />
+                      <Check className="w-4 h-4 sm:w-5 sm:h-5" />
                     ) : (
-                      <span className="text-sm font-semibold">{step.id}</span>
+                      <span className="text-xs sm:text-sm font-semibold">{step.id}</span>
                     )}
                   </div>
                   {index < STEPS.length - 1 && (
                     <div
-                      className={`w-16 h-0.5 mx-2 transition-all ${
+                      className={`w-8 sm:w-12 lg:w-16 h-0.5 mx-1 sm:mx-2 transition-all ${
                         currentStep > step.id ? 'bg-sky-600' : 'bg-slate-200'
                       }`}
                     />
@@ -401,7 +401,16 @@ export default function NewRequestPage() {
                 </div>
               ))}
             </div>
-            <div className="mt-4 text-center">
+            <div className="sm:hidden flex items-center gap-3 p-3 bg-sky-50 rounded-xl">
+              <div className="w-10 h-10 bg-sky-600 rounded-full flex items-center justify-center text-white font-semibold">
+                {currentStep}
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-800">{STEPS[currentStep - 1].title}</p>
+                <p className="text-xs text-slate-500">Step {currentStep} of {STEPS.length}</p>
+              </div>
+            </div>
+            <div className="hidden sm:block mt-4 text-center">
               <p className="text-sm font-medium text-slate-800">{STEPS[currentStep - 1].title}</p>
               <p className="text-xs text-slate-500">{STEPS[currentStep - 1].description}</p>
             </div>
@@ -484,11 +493,25 @@ export default function NewRequestPage() {
           </div>
         </div>
 
-        <div className="w-80 flex-shrink-0">
-          <div className="sticky top-24">
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 mb-4">
-              <h3 className="text-sm font-semibold text-slate-800 mb-4">Amount Summary</h3>
-              <div className="space-y-2 text-sm">
+        <div className="w-full lg:w-80 flex-shrink-0 order-1 lg:order-2">
+          <div className="lg:sticky lg:top-24">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 lg:p-6 mb-4">
+              <div className="flex items-center justify-between lg:block">
+                <div className="flex items-center gap-3 lg:block">
+                  <h3 className="text-sm font-semibold text-slate-800 lg:mb-4">Amount Summary</h3>
+                  <p className="text-xl lg:hidden font-bold text-slate-800">${totalAmount.toLocaleString()}</p>
+                </div>
+                <div
+                  className={`lg:hidden px-2 py-1 rounded-lg text-[10px] font-medium ${
+                    totalAmount <= 500
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'bg-amber-50 text-amber-700'
+                  }`}
+                >
+                  {totalAmount <= 500 ? 'Auto-Approve' : 'Needs Approval'}
+                </div>
+              </div>
+              <div className="hidden lg:block space-y-2 text-sm">
                 <div className="flex justify-between text-slate-600">
                   <span>Purchase Amount</span>
                   <span>${formData.purchase_amount.toLocaleString()}</span>
@@ -507,7 +530,7 @@ export default function NewRequestPage() {
                 </div>
               </div>
               <div
-                className={`mt-4 p-3 rounded-lg text-xs ${
+                className={`hidden lg:block mt-4 p-3 rounded-lg text-xs ${
                   totalAmount <= 500
                     ? 'bg-emerald-50 text-emerald-700'
                     : 'bg-amber-50 text-amber-700'
@@ -516,19 +539,19 @@ export default function NewRequestPage() {
                 {getApprovalTier(totalAmount)}
               </div>
               {pcardUsage && wouldExceedLimit && totalAmount > 0 && (
-                <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <div className="mt-3 p-2 lg:p-3 bg-red-50 border border-red-200 rounded-lg">
                   <div className="flex items-start gap-2">
                     <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-                    <div className="text-xs text-red-700">
+                    <div className="text-[10px] lg:text-xs text-red-700">
                       <p className="font-semibold">Exceeds Monthly Limit</p>
-                      <p>This would bring total to ${(pcardUsage.current_usage + totalAmount).toLocaleString()} (${(pcardUsage.current_usage + totalAmount - pcardUsage.monthly_limit).toLocaleString()} over limit)</p>
+                      <p className="hidden lg:block">This would bring total to ${(pcardUsage.current_usage + totalAmount).toLocaleString()} (${(pcardUsage.current_usage + totalAmount - pcardUsage.monthly_limit).toLocaleString()} over limit)</p>
                     </div>
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+            <div className="hidden lg:block bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
               <h3 className="text-sm font-semibold text-slate-800 mb-4">Pre-Charge Checklist</h3>
               <div className="space-y-3">
                 {checklist.map((item) => (
@@ -648,8 +671,8 @@ function Step2PurchaseDetails({
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="col-span-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="col-span-1 sm:col-span-2">
           <label className="block text-sm font-medium text-slate-700 mb-2">Vendor Name</label>
           <div className="relative">
             <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -665,7 +688,7 @@ function Step2PurchaseDetails({
         </div>
 
         {isGoDaddyVendor && (
-          <div className="col-span-2">
+          <div className="col-span-1 sm:col-span-2">
             <div className="p-4 bg-teal-50 border border-teal-200 rounded-xl">
               <div className="flex items-start gap-3">
                 <Globe className="w-5 h-5 text-teal-600 flex-shrink-0 mt-0.5" />
@@ -695,7 +718,7 @@ function Step2PurchaseDetails({
             </div>
           </div>
         )}
-        <div className="col-span-2">
+        <div className="col-span-1 sm:col-span-2">
           <label className="block text-sm font-medium text-slate-700 mb-2">
             Vendor Location (City/State)
           </label>
@@ -710,7 +733,7 @@ function Step2PurchaseDetails({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-2">Purchase Amount</label>
           <div className="relative">
@@ -1001,8 +1024,8 @@ function Step5ReviewSign({
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-medium text-slate-800 mb-4">Review Your Request</h3>
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div className="col-span-2 pb-4 border-b border-slate-200">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+          <div className="col-span-1 sm:col-span-2 pb-4 border-b border-slate-200">
             <p className="text-slate-500">Vendor</p>
             <p className="font-medium text-slate-800">{formData.vendor_name}</p>
             {formData.vendor_location && (
@@ -1017,7 +1040,7 @@ function Step5ReviewSign({
             <p className="text-slate-500">Category</p>
             <p className="font-medium text-slate-800">{formData.category}</p>
           </div>
-          <div className="col-span-2">
+          <div className="col-span-1 sm:col-span-2">
             <p className="text-slate-500">Business Purpose</p>
             <p className="font-medium text-slate-800">{formData.business_purpose}</p>
           </div>

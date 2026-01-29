@@ -173,28 +173,28 @@ export default function MyRequestsPage() {
               <Link
                 key={request.id}
                 to={`/request/${request.id}`}
-                className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors"
+                className="flex items-center justify-between p-3 sm:p-4 hover:bg-slate-50 transition-colors"
               >
-                <div className="flex items-center gap-4 flex-1 min-w-0">
-                  <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <DollarSign className="w-6 h-6 text-slate-500" />
+                <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <DollarSign className="w-5 h-5 sm:w-6 sm:h-6 text-slate-500" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <p className="text-sm font-medium text-slate-800 truncate">
                         {request.vendor_name}
                       </p>
                       <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(
+                        className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium ${getStatusBadge(
                           request.status
                         )}`}
                       >
                         {getStatusIcon(request.status)}
-                        {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                        <span className="hidden xs:inline">{request.status.charAt(0).toUpperCase() + request.status.slice(1)}</span>
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500 truncate">{request.business_purpose}</p>
-                    <div className="flex items-center gap-3 mt-2">
+                    <p className="text-xs text-slate-500 truncate hidden sm:block">{request.business_purpose}</p>
+                    <div className="flex items-center gap-2 sm:gap-3 mt-1.5 sm:mt-2">
                       <OrderJourney
                         steps={calculateJourneySteps(
                           request,
@@ -204,17 +204,17 @@ export default function MyRequestsPage() {
                         )}
                         compact
                       />
-                      <span className="text-[10px] text-slate-400">
+                      <span className="text-[10px] text-slate-400 hidden sm:inline">
                         {formatDate(request.created_at)}
                       </span>
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-4 flex-shrink-0 ml-4">
-                  <span className="text-lg font-semibold text-slate-800">
+                <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0 ml-2 sm:ml-4">
+                  <span className="text-base sm:text-lg font-semibold text-slate-800">
                     ${request.total_amount.toLocaleString()}
                   </span>
-                  <ChevronRight className="w-5 h-5 text-slate-400" />
+                  <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
                 </div>
               </Link>
             ))
